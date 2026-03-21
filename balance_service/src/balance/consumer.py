@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from src.config.project import settings
-from src.config.database.session import AsyncSessionFactory
+from src.config.database.engine import db_helper
 from src.balance.repositories.balance import BalanceRepository
 from src.balance.service.balance import BalanceService
 from shared.logging import get_logger
@@ -38,7 +38,7 @@ async def handle_quiz_reward_message(
         logger.error("Failed to deserialize quiz reward event", error=str(exc), raw=raw[:300])
         raise  # nack to DLQ
 
-    async with AsyncSessionFactory() as session:
+    async with db_helper.get_db_session() as session:
         async with session.begin():
             repo = BalanceRepository(session)
             service = BalanceService(repo)

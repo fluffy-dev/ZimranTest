@@ -1,16 +1,14 @@
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.config.database.engine import db_helper
+from src.config.database.session import ISession
 from src.attempt.repositories.attempt import AttemptRepository
 from src.attempt.repositories.outbox import OutboxRepository
 
-def _get_attempt_repository(session: AsyncSession = Depends(db_helper.get_session)) -> AttemptRepository:
+def _get_attempt_repository(session: ISession) -> AttemptRepository:
     return AttemptRepository(session)
 
-def _get_outbox_repository(session: AsyncSession = Depends(db_helper.get_session)) -> OutboxRepository:
+def _get_outbox_repository(session: ISession) -> OutboxRepository:
     return OutboxRepository(session)
 
 IAttemptRepository = Annotated[AttemptRepository, Depends(_get_attempt_repository)]
