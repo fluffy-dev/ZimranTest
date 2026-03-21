@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from src.config.project import settings
+from src.config.rabbitmq import settings as rmq_settings
 from src.config.database.engine import db_helper
 from src.balance.repositories.balance import BalanceRepository
 from src.balance.service.balance import BalanceService
@@ -54,11 +54,11 @@ async def handle_quiz_reward_message(
 
 async def start_consumer() -> MessageConsumer:
     consumer = RabbitMQConsumer(
-        url=settings.RABBITMQ_URL,
-        queue_name=settings.RABBITMQ_QUEUE,
-        exchange_name=settings.RABBITMQ_EXCHANGE,
-        routing_key=settings.RABBITMQ_ROUTING_KEY,
-        dlq_name=f"{settings.RABBITMQ_QUEUE}.dlq",
+        url=rmq_settings.url,
+        queue_name=rmq_settings.queue,
+        exchange_name=rmq_settings.exchange,
+        routing_key=rmq_settings.routing_key,
+        dlq_name=f"{rmq_settings.queue}.dlq",
         prefetch_count=10,
     )
     await consumer.connect()

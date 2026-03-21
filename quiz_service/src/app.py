@@ -12,7 +12,9 @@ from src.health.router import router as health_router
 from src.quiz.router import router as quizzes_router
 from src.attempt.router import router as attempts_router
 from src import lifespan as _lifespan
-from src.config.project import settings
+from src.config.project import settings as project_settings
+from src.config.swagger import settings as swagger_settings
+from src.config.cors import settings as cors_settings
 from shared.exceptions import (
     AttemptAlreadyCompletedException,
     ConflictException,
@@ -22,7 +24,7 @@ from shared.exceptions import (
 )
 from shared.logging import configure_logging
 
-configure_logging(service_name=settings.APP_NAME, log_level=settings.LOG_LEVEL)
+configure_logging(service_name="quiz-service", log_level="INFO")
 logger = structlog.get_logger(__name__)
 
 
@@ -34,27 +36,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    **settings.fastapi_kwargs,
+    title=swagger_settings.title,
+    description=swagger_settings.description,
+    summary=swagger_settings.summary,
+    version=project_settings.version,
+    terms_of_service=swagger_settings.terms_of_service,
+    contact=swagger_settings.contact,
+    license_info=swagger_settings.license,
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
+    docs_url=swagger_settings.docs_url,
+    redoc_url=swagger_settings.redoc_url,
     default_response_class=JSONResponse,
 )
 
 # ── Middleware ──────────────────────────────────────────────────────────────
 
-def _get_cors_list(value: list[str] | str) -> list[str]:
-    if isinstance(value, str):
-        return [x.strip() for x in value.split(",") if x.strip()]
-    return value
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_get_cors_list(settings.CORS_ALLOW_ORIGINS),
-    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-    allow_methods=_get_cors_list(settings.CORS_ALLOW_METHODS),
-    allow_headers=_get_cors_list(settings.CORS_ALLOW_HEADERS),
-    expose_headers=_get_cors_list(settings.CORS_EXPOSE_HEADERS),
-    max_age=settings.CORS_MAX_AGE,
+    allow_origins=cors_settings.allow_origins,
+    allow_credentials=cors_settings.allow_credentials,
+    allow_methods=cors_settings.allow_methods,
+    allow_headers=cors_settings.allow_headers,
+    expose_headers=cors_settings.expose_headers,
+    max_age=cors_settings.max_age,
 )
 
 

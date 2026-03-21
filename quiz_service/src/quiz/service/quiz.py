@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from src.config.project import settings
+from src.config.redis import settings as redis_settings
 from app.dependencies.common import IRedis
 from src.quiz.dependencies.repository import IQuizRepository
 from src.quiz.dto import QuizDetailResponseDTO, QuizListResponseDTO, CreateQuizDTO
@@ -46,7 +46,7 @@ class QuizService:
             for q in quizzes
         ]
         response = QuizListResponseDTO(items=items, total=total, page=page, page_size=page_size)
-        await self._redis.setex(cache_key, settings.QUIZ_CACHE_TTL, response.model_dump_json())
+        await self._redis.setex(cache_key, redis_settings.quiz_cache_ttl, response.model_dump_json())
         return response
 
     async def get_quiz(self, quiz_id: uuid.UUID, locale: str) -> QuizDetailResponseDTO:
@@ -76,7 +76,7 @@ class QuizService:
             description=self._localize(quiz.description, locale),
             questions=questions_out,
         )
-        await self._redis.setex(cache_key, settings.QUIZ_CACHE_TTL, response.model_dump_json())
+        await self._redis.setex(cache_key, redis_settings.quiz_cache_ttl, response.model_dump_json())
         return response
 
     def _localize_question_payload(self, payload: dict[str, Any], question_type: str, locale: str) -> dict[str, Any]:

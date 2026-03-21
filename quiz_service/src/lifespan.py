@@ -5,7 +5,9 @@ import json
 
 import redis.asyncio as aioredis
 
-from src.config.project import settings
+from src.config.redis import settings as redis_settings
+from src.config.rabbitmq import settings as rmq_settings
+from src.config.outbox import settings as outbox_settings
 from src.config.database.session import AsyncSessionFactory
 from app.repositories.outbox_repository import OutboxRepository
 from shared.logging import get_logger
@@ -34,13 +36,13 @@ async def _run_outbox_poller() -> None:
     global _publisher
     assert _publisher is not None
 
-    logger.info("Outbox poller started", interval=settings.OUTBOX_POLL_INTERVAL)
+    logger.info("Outbox poller started", interval=outbox_settings.poll_interval)
 
     while True:
         try:
             async with AsyncSessionFactory() as session:
                 repo = OutboxRepository(session)
-                events = await repo.get_pending_events(batch_size=settings.OUTBOX_BATCH_SIZE)
+                events = await repo.get_pending_events(batch_size=outbox_settings.batch_size)
 
                 for event in events:
                     try:
@@ -70,7 +72,7 @@ async def _run_outbox_poller() -> None:
         except Exception as exc:
             logger.error("Outbox poller iteration error", error=str(exc))
 
-        await asyncio.sleep(settings.OUTBOX_POLL_INTERVAL)
+        await asyncio.sleep(outbox_settings.poll_interval)
 
 
 async def startup() -> None:
@@ -78,15 +80,15 @@ async def startup() -> None:
 
     # Redis
     redis_client = aioredis.from_url(
-        settings.REDIS_URL, encoding="utf-8", decode_responses=True
+        redis_settings.url, encoding="utf-8", decode_responses=True
     )
     await redis_client.ping()
-    logger.info("Redis connected", url=settings.REDIS_URL)
+    logger.info("Redis connected", url=redis_settings.url)
 
     # Publisher — swap class here to change broker
     _publisher = RabbitMQPublisher(
-        url=settings.RABBITMQ_URL,
-        exchange_name=settings.RABBITMQ_EXCHANGE,
+        url=rmq_settings.url,
+        exchange_name=rmq_settings.exchange,
     )
     await _publisher.connect()
 

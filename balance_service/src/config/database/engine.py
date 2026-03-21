@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
     async_scoped_session,
 )
 
-from src.config.project import settings
+from src.config.database.settings import settings as db_settings
 
 class DatabaseHelper:
     """Class helper for work with database session"""
@@ -57,8 +57,6 @@ class DatabaseHelper:
 
 
 db_helper = DatabaseHelper(
-    url=settings.DATABASE_URL,
-    echo=settings.DB_ECHO_LOG,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
+    url=db_settings.database_url,
+    echo=db_settings.db_echo_log,
 )
