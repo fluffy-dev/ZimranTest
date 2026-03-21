@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class AnswerItem(BaseModel):
+class AnswerItemDTO(BaseModel):
     question_id: uuid.UUID
     answer_payload: dict[str, Any] = Field(
         ...,
@@ -20,25 +18,25 @@ class AnswerItem(BaseModel):
     )
 
 
-class SubmitAttemptRequest(BaseModel):
-    answers: list[AnswerItem] = Field(..., min_length=1)
+class SubmitAttemptDTO(BaseModel):
+    answers: list[AnswerItemDTO] = Field(..., min_length=1)
 
 
-class QuestionResultItem(BaseModel):
+class QuestionResultItemDTO(BaseModel):
     question_id: uuid.UUID
     is_correct: bool
     was_already_rewarded: bool
 
 
-class AttemptResultResponse(BaseModel):
+class AttemptResultResponseDTO(BaseModel):
     attempt_id: uuid.UUID
     score: int
     total_questions: int
     coins_awarded: int
-    question_results: list[QuestionResultItem]
+    question_results: list[QuestionResultItemDTO]
 
 
-class AttemptStartResponse(BaseModel):
+class AttemptStartResponseDTO(BaseModel):
     attempt_id: uuid.UUID
     quiz_id: uuid.UUID
     user_id: uuid.UUID

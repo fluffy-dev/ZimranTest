@@ -3,12 +3,10 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-import redis.asyncio as aioredis
-
-from app.core.config import settings
+from src.config.project import settings
 from app.dependencies.common import IRedis
-from app.dependencies.repositories import IQuizRepository
-from app.schemas.quiz import QuizDetailResponse, QuizListResponse, CreateQuizRequest
+from src.quiz.dependencies.repository import IQuizRepository
+from src.quiz.dto import QuizDetailResponseDTO, QuizListResponseDTO, CreateQuizDTO
 from shared.exceptions import NotFoundException
 from shared.logging import get_logger
 
@@ -16,7 +14,7 @@ logger = get_logger(__name__)
 
 
 class QuizService:
-    """Manages quiz CRUD and localized retrieval. Instantiated by deps.py factory."""
+    """Manages quiz CRUD and localized retrieval. Maps Entities to DTOs."""
 
     def __init__(self, quiz_repo: IQuizRepository, redis: IRedis) -> None:
         self._repo = quiz_repo
@@ -28,11 +26,11 @@ class QuizService:
         key = locale.lower().strip()
         return jsonb_field.get(key) or jsonb_field.get("en") or next(iter(jsonb_field.values()), None)
 
-    async def list_quizzes(self, locale: str, page: int = 1, page_size: int = 20) -> QuizListResponse:
+    async def list_quizzes(self, locale: str, page: int = 1, page_size: int = 20) -> QuizListResponseDTO:
         cache_key = f"quizzes:list:{locale}:{page}:{page_size}"
         cached = await self._redis.get(cache_key)
         if cached:
-            return QuizListResponse.model_validate_json(cached)
+            return QuizListResponseDTO.model_validate_json(cached)
 
         offset = (page - 1) * page_size
         quizzes = await self._repo.get_all_active(limit=page_size, offset=offset)
@@ -47,15 +45,15 @@ class QuizService:
             }
             for q in quizzes
         ]
-        response = QuizListResponse(items=items, total=total, page=page, page_size=page_size)
+        response = QuizListResponseDTO(items=items, total=total, page=page, page_size=page_size)
         await self._redis.setex(cache_key, settings.QUIZ_CACHE_TTL, response.model_dump_json())
         return response
 
-    async def get_quiz(self, quiz_id: uuid.UUID, locale: str) -> QuizDetailResponse:
+    async def get_quiz(self, quiz_id: uuid.UUID, locale: str) -> QuizDetailResponseDTO:
         cache_key = f"quizzes:{quiz_id}:{locale}"
         cached = await self._redis.get(cache_key)
         if cached:
-            return QuizDetailResponse.model_validate_json(cached)
+            return QuizDetailResponseDTO.model_validate_json(cached)
 
         quiz = await self._repo.get_by_id(quiz_id)
         if quiz is None or not quiz.is_active:
@@ -72,7 +70,7 @@ class QuizService:
                 "payload": localized_payload,
             })
 
-        response = QuizDetailResponse(
+        response = QuizDetailResponseDTO(
             id=str(quiz.id),
             title=self._localize(quiz.title, locale),
             description=self._localize(quiz.description, locale),
@@ -97,7 +95,7 @@ class QuizService:
                 pair["right"] = self._localize(pair.get("right", {}), locale) or ""
         return p
 
-    async def create_quiz(self, request: CreateQuizRequest) -> QuizDetailResponse:
+    async def create_quiz(self, request: CreateQuizDTO) -> QuizDetailResponseDTO:
         quiz = await self._repo.create(title=request.title, description=request.description)
         for i, q_req in enumerate(request.questions):
             await self._repo.add_question(

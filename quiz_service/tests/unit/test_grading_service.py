@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.db.models import QuestionType
-from app.services.grading_service import GradingService
+from src.quiz.models.quiz import QuestionType
+from src.attempt.service.grading import GradingService
 from shared.exceptions import ValidationException
 
 

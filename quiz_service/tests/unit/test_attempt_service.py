@@ -6,10 +6,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.db.models import AttemptStatus, QuestionType
-from app.schemas.attempt import SubmitAttemptRequest, AnswerItem
-from app.services.attempt_service import AttemptService, COINS_PER_CORRECT_ANSWER
-from app.services.grading_service import GradingService
+from src.attempt.models.attempt import AttemptStatus
+from src.quiz.models.quiz import QuestionType
+from src.attempt.dto import SubmitAttemptDTO, AnswerItemDTO
+from src.attempt.service.attempt import AttemptService, COINS_PER_CORRECT_ANSWER
+from src.attempt.service.grading import GradingService
 
 
 def make_attempt(
@@ -53,7 +54,6 @@ def mock_outbox_repo():
 def service(mock_quiz_repo, mock_attempt_repo, mock_outbox_repo):
     grading = GradingService()
     return AttemptService(
-        session=AsyncMock(),
         quiz_repo=mock_quiz_repo,
         attempt_repo=mock_attempt_repo,
         outbox_repo=mock_outbox_repo,
@@ -85,10 +85,10 @@ class TestSubmitAttempt:
         completed.total_questions = 2
         mock_attempt_repo.complete_attempt.return_value = completed
 
-        request = SubmitAttemptRequest(
+        request = SubmitAttemptDTO(
             answers=[
-                AnswerItem(question_id=q1_id, answer_payload={"selected_id": "a"}),
-                AnswerItem(question_id=q2_id, answer_payload={"selected_id": "a"}),
+                AnswerItemDTO(question_id=q1_id, answer_payload={"selected_id": "a"}),
+                AnswerItemDTO(question_id=q2_id, answer_payload={"selected_id": "a"}),
             ]
         )
 
@@ -118,8 +118,8 @@ class TestSubmitAttempt:
         completed.total_questions = 1
         mock_attempt_repo.complete_attempt.return_value = completed
 
-        request = SubmitAttemptRequest(
-            answers=[AnswerItem(question_id=q1_id, answer_payload={"selected_id": "a"})]
+        request = SubmitAttemptDTO(
+            answers=[AnswerItemDTO(question_id=q1_id, answer_payload={"selected_id": "a"})]
         )
 
         result = await service.submit_attempt(
@@ -140,8 +140,8 @@ class TestSubmitAttempt:
         attempt = make_attempt(user_id=user_id, status=AttemptStatus.COMPLETED)
         mock_attempt_repo.get_by_id.return_value = attempt
 
-        request = SubmitAttemptRequest(
-            answers=[AnswerItem(question_id=uuid.uuid4(), answer_payload={"selected_id": "a"})]
+        request = SubmitAttemptDTO(
+            answers=[AnswerItemDTO(question_id=uuid.uuid4(), answer_payload={"selected_id": "a"})]
         )
 
         with pytest.raises(AttemptAlreadyCompletedException):

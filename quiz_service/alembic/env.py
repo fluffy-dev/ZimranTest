@@ -7,7 +7,9 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 # Import all models so Alembic can detect them
-from app.db.models import Base
+from src.libs.base_model import Base
+from src.quiz.models.quiz import Quiz, Question
+from src.attempt.models.attempt import QuizAttempt, UserQuestionAnswer, UserRewardedQuestion, OutboxEvent
 
 config = context.config
 if config.config_file_name is not None:

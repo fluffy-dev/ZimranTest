@@ -1,21 +1,32 @@
-from __future__ import annotations
-
 import uuid
 from typing import Any
 
 from sqlalchemy import select, update
 
-from app.db.models import OutboxEvent
-from app.dependencies.common import ISession
+from src.attempt.models.attempt import OutboxEvent
+from src.attempt.entities import OutboxEventEntity
+from src.config.database.session import AsyncSession
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class OutboxRepository:
-    """Handles Transactional Outbox event persistence and marking as published."""
+def _map_outbox_event(event: OutboxEvent) -> OutboxEventEntity:
+    return OutboxEventEntity(
+        id=event.id,
+        event_type=event.event_type,
+        routing_key=event.routing_key,
+        payload=event.payload,
+        created_at=event.created_at,
+        published_at=event.published_at,
+        attempts=event.attempts,
+    )
 
-    def __init__(self, session: ISession) -> None:
+
+class OutboxRepository:
+    """Handles Transactional Outbox event persistence returning pure domain entities."""
+
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def insert_event(
@@ -24,7 +35,7 @@ class OutboxRepository:
         event_type: str,
         routing_key: str,
         payload: dict[str, Any],
-    ) -> OutboxEvent:
+    ) -> OutboxEventEntity:
         event = OutboxEvent(
             id=event_id,
             event_type=event_type,
@@ -33,17 +44,16 @@ class OutboxRepository:
         )
         self._session.add(event)
         await self._session.flush()
-        return event
+        return _map_outbox_event(event)
 
-    async def get_pending_events(self, batch_size: int = 50) -> list[OutboxEvent]:
-        """Fetch events not yet published, ordered by creation time (FIFO)."""
+    async def get_pending_events(self, batch_size: int = 50) -> list[OutboxEventEntity]:
         result = await self._session.execute(
             select(OutboxEvent)
             .where(OutboxEvent.published_at.is_(None))
             .order_by(OutboxEvent.created_at.asc())
             .limit(batch_size)
         )
-        return list(result.scalars().all())
+        return [_map_outbox_event(e) for e in result.scalars().all()]
 
     async def mark_published(self, event_id: uuid.UUID) -> None:
         from datetime import datetime, timezone

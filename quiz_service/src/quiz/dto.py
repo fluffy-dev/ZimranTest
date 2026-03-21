@@ -1,26 +1,22 @@
-from __future__ import annotations
-
-import uuid
 from typing import Any
-
 from pydantic import BaseModel, Field
 
 
-class QuizSummaryItem(BaseModel):
+class QuizSummaryItemDTO(BaseModel):
     id: str
     title: str | None
     description: str | None
     question_count: int
 
 
-class QuizListResponse(BaseModel):
-    items: list[QuizSummaryItem]
+class QuizListResponseDTO(BaseModel):
+    items: list[QuizSummaryItemDTO]
     total: int
     page: int
     page_size: int
 
 
-class QuestionOut(BaseModel):
+class QuestionOutDTO(BaseModel):
     id: str
     type: str
     order_index: int
@@ -28,29 +24,25 @@ class QuestionOut(BaseModel):
     payload: dict[str, Any]  # correct answers stripped server-side
 
 
-class QuizDetailResponse(BaseModel):
+class QuizDetailResponseDTO(BaseModel):
     id: str
     title: str | None
     description: str | None
-    questions: list[QuestionOut]
+    questions: list[QuestionOutDTO]
 
 
-class CreateQuestionRequest(BaseModel):
+class CreateQuestionDTO(BaseModel):
     type: str = Field(..., description="single_choice | fill_gap | multiple_choice | matching")
     text: dict[str, str] = Field(..., description='Localized text: {"en": "...", "de": "..."}')
     payload: dict[str, Any] = Field(
         ...,
         description=(
-            "Type-specific payload. "
-            "single_choice: {options: [...], correct_id: str}; "
-            "fill_gap: {correct_answers: [str]}; "
-            "multiple_choice: {options: [...], correct_ids: [str]}; "
-            "matching: {pairs: [{id, left, right}]}"
+            "Type-specific payload."
         ),
     )
 
 
-class CreateQuizRequest(BaseModel):
+class CreateQuizDTO(BaseModel):
     title: dict[str, str] = Field(..., description='Localized: {"en": "Title", "de": "Titel"}')
     description: dict[str, str] | None = None
-    questions: list[CreateQuestionRequest] = Field(default_factory=list)
+    questions: list[CreateQuestionDTO] = Field(default_factory=list)

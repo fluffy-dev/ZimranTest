@@ -1,12 +1,9 @@
-from __future__ import annotations
-
 import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from sqlalchemy import (
-    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -14,99 +11,19 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-
-class Base(DeclarativeBase):
-    pass
-
-
-class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-
-class QuestionType(str, Enum):
-    SINGLE_CHOICE = "single_choice"
-    FILL_GAP = "fill_gap"
-    MULTIPLE_CHOICE = "multiple_choice"
-    MATCHING = "matching"
+from src.libs.base_model import Base
+from src.quiz.models.quiz import Question, Quiz
 
 
 class AttemptStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
-
-
-class Quiz(TimestampMixin, Base):
-    """
-    A quiz with localized title and description.
-    title/description stored as JSONB: {"en": "...", "de": "...", "tr": "...", ...}
-    """
-
-    __tablename__ = "quizzes"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    title: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    description: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
-    questions: Mapped[list[Question]] = relationship(
-        "Question", back_populates="quiz", cascade="all, delete-orphan", lazy="selectin"
-    )
-    attempts: Mapped[list[QuizAttempt]] = relationship(
-        "QuizAttempt", back_populates="quiz"
-    )
-
-
-class Question(TimestampMixin, Base):
-    """
-    A quiz question. Type-specific data is stored in JSONB payload.
-
-    Payload shapes:
-    - single_choice:   {"options": [{"id": str, "text": {locale: str}}, ...], "correct_id": str}
-    - fill_gap:        {"correct_answers": [str, ...]}  (list of accepted strings, case-insensitive)
-    - multiple_choice: {"options": [{"id": str, "text": {locale: str}}, ...], "correct_ids": [str, ...]}
-    - matching:        {"pairs": [{"id": str, "left": {locale: str}, "right": {locale: str}}, ...]}
-    """
-
-    __tablename__ = "questions"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    quiz_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False
-    )
-    type: Mapped[str] = mapped_column(String(30), nullable=False)
-    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    text: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-
-    quiz: Mapped[Quiz] = relationship("Quiz", back_populates="questions")
-    answers: Mapped[list[UserQuestionAnswer]] = relationship(
-        "UserQuestionAnswer", back_populates="question"
-    )
-
-    __table_args__ = (
-        Index("idx_questions_quiz_id", "quiz_id"),
-        Index("idx_questions_quiz_order", "quiz_id", "order_index"),
-    )
 
 
 class QuizAttempt(Base):
@@ -134,7 +51,7 @@ class QuizAttempt(Base):
     )
 
     quiz: Mapped[Quiz] = relationship("Quiz", back_populates="attempts")
-    answers: Mapped[list[UserQuestionAnswer]] = relationship(
+    answers: Mapped[list["UserQuestionAnswer"]] = relationship(
         "UserQuestionAnswer", back_populates="attempt", cascade="all, delete-orphan"
     )
 
@@ -176,8 +93,7 @@ class UserQuestionAnswer(Base):
 class UserRewardedQuestion(Base):
     """
     Records which questions a user has already been rewarded for answering correctly.
-    Composite PK (user_id, question_id) provides natural idempotency — a user can
-    only be rewarded once per question regardless of how many correct attempts they make.
+    Composite PK (user_id, question_id) provides natural idempotency.
     """
 
     __tablename__ = "user_rewarded_questions"
@@ -196,8 +112,7 @@ class UserRewardedQuestion(Base):
 class OutboxEvent(Base):
     """
     Transactional Outbox table.
-    Events are written atomically with business data in the same DB transaction,
-    then published to RabbitMQ by a background worker.
+    Events are written atomically with business data in the same DB transaction.
     """
 
     __tablename__ = "outbox_events"
