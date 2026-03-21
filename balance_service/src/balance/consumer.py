@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 
-from app.core.config import settings
-from app.db.session import AsyncSessionFactory
-from app.repositories.balance_repository import BalanceRepository
-from app.services.balance_service import BalanceService
+from src.config.project import settings
+from src.config.database.session import AsyncSessionFactory
+from src.balance.repositories.balance import BalanceRepository
+from src.balance.service.balance import BalanceService
 from shared.logging import get_logger
 from shared.messaging import MessageConsumer
 from shared.messaging.rabbitmq import RabbitMQConsumer

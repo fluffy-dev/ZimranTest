@@ -1,15 +1,11 @@
-from __future__ import annotations
-
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
-
-class Base(DeclarativeBase):
-    pass
+from src.libs.base_model import Base
 
 
 class Balance(Base):
@@ -34,7 +30,6 @@ class BalanceTransaction(Base):
     """
     Immutable ledger record for each balance change.
     idempotency_key = event_id from the quiz service outbox event.
-    UNIQUE constraint prevents double-crediting the same event.
     """
 
     __tablename__ = "balance_transactions"

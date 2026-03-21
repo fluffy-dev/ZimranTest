@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.balance_service import BalanceService
+from src.balance.service.balance import BalanceService
 from types import SimpleNamespace
 from shared.schemas import QuizRewardEvent, QuizRewardPayload
 

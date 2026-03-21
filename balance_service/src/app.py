@@ -8,9 +8,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1.routers import balance
-from app.core import lifespan as _lifespan
-from app.core.config import settings
+from src.balance.router import router as balance_router
+from src import lifespan as _lifespan
+from src.config.project import settings
 from shared.exceptions import FineloBaseException, NotFoundException
 from shared.logging import configure_logging
 
@@ -88,7 +88,7 @@ async def liveness() -> dict:
 @app.get("/health/ready")
 async def readiness() -> dict:
     from sqlalchemy import text
-    from app.db.session import engine
+    from src.config.database.session import engine
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
@@ -100,4 +100,4 @@ async def readiness() -> dict:
         )
 
 
-app.include_router(balance.router, prefix="/api/v1")
+app.include_router(balance_router, prefix="/api/v1")

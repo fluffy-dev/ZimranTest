@@ -6,7 +6,8 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.db.models import Base
+from src.libs.base_model import Base
+from src.balance.models.balance import Balance, BalanceTransaction
 
 config = context.config
 if config.config_file_name is not None:

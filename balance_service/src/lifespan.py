@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from app.core.config import settings
-from app.messaging.consumer import handle_quiz_reward_message, start_consumer
+from src.config.project import settings
+from src.balance.consumer import handle_quiz_reward_message, start_consumer
 from shared.logging import get_logger
 
 logger = get_logger(__name__)

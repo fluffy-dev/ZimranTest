@@ -6,13 +6,13 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class BalanceResponse(BaseModel):
+class BalanceResponseDTO(BaseModel):
     user_id: uuid.UUID
     amount: int
     updated_at: datetime
 
 
-class TransactionResponse(BaseModel):
+class TransactionResponseDTO(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     type: str
@@ -21,7 +21,7 @@ class TransactionResponse(BaseModel):
     created_at: datetime
 
 
-class TransactionListResponse(BaseModel):
-    items: list[TransactionResponse]
+class TransactionListResponseDTO(BaseModel):
+    items: list[TransactionResponseDTO]
     page: int
     page_size: int
