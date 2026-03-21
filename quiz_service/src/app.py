@@ -34,23 +34,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    title="Finelo — Quiz Service",
-    description="Manages quizzes, localized questions, and answer grading for the Finelo platform.",
-    version="1.0.0",
-    lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    **settings.fastapi_kwargs,
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
+    default_response_class=JSONResponse,
 )
 
 # ── Middleware ──────────────────────────────────────────────────────────────
 
+def _get_cors_list(value: list[str] | str) -> list[str]:
+    if isinstance(value, str):
+        return [x.strip() for x in value.split(",") if x.strip()]
+    return value
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_get_cors_list(settings.CORS_ALLOW_ORIGINS),
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=_get_cors_list(settings.CORS_ALLOW_METHODS),
+    allow_headers=_get_cors_list(settings.CORS_ALLOW_HEADERS),
+    expose_headers=_get_cors_list(settings.CORS_EXPOSE_HEADERS),
+    max_age=settings.CORS_MAX_AGE,
 )
 
 
