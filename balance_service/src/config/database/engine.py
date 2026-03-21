@@ -59,4 +59,6 @@ class DatabaseHelper:
 db_helper = DatabaseHelper(
     url=db_settings.database_url,
     echo=db_settings.db_echo_log,
+    pool_size=db_settings.db_pool_size,
+    max_overflow=db_settings.db_max_overflow,
 )
