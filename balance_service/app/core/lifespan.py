@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+import asyncio
+
+from app.core.config import settings
+from app.messaging.consumer import handle_quiz_reward_message, start_consumer
+from shared.logging import get_logger
+
+logger = get_logger(__name__)
+
+_consumer = None
+_consumer_task = None
+
+
+async def startup() -> None:
+    global _consumer, _consumer_task
+
+    _consumer = await start_consumer()
+    _consumer_task = asyncio.create_task(
+        _consumer.consume(handle_quiz_reward_message)
+    )
+    logger.info("RabbitMQ consumer started", queue=settings.RABBITMQ_QUEUE)
+
+
+async def shutdown() -> None:
+    global _consumer, _consumer_task
+
+    if _consumer_task:
+        _consumer_task.cancel()
+        try:
+            await _consumer_task
+        except asyncio.CancelledError:
+            pass
+
+    if _consumer:
+        await _consumer.close()
