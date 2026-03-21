@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter
 
-from app.dependencies.common import IUserID
+from src.dependencies.common import IUserID
 from src.attempt.dependencies.service import IAttemptService
 from src.attempt.dto import AttemptStartResponseDTO, AttemptResultResponseDTO, SubmitAttemptDTO
 

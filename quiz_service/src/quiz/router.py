@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Query, status
 
-from app.dependencies.common import ILocale
+from src.dependencies.common import ILocale
 from src.quiz.dependencies.service import IQuizService
 from src.quiz.dto import CreateQuizDTO, QuizDetailResponseDTO, QuizListResponseDTO
 

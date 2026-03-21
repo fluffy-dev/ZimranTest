@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1.routers import health
+from src.health.router import router as health_router
 from src.quiz.router import router as quizzes_router
 from src.attempt.router import router as attempts_router
 from src import lifespan as _lifespan
@@ -111,6 +111,6 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
 
 # ── Routers ─────────────────────────────────────────────────────────────────
 
-app.include_router(health.router)
+app.include_router(health_router)
 app.include_router(quizzes_router, prefix="/api/v1")
 app.include_router(attempts_router, prefix="/api/v1")
