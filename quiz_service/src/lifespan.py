@@ -5,8 +5,8 @@ import json
 
 import redis.asyncio as aioredis
 
-from app.core.config import settings
-from app.db.session import AsyncSessionFactory
+from src.config.project import settings
+from src.config.database.session import AsyncSessionFactory
 from app.repositories.outbox_repository import OutboxRepository
 from shared.logging import get_logger
 from shared.messaging import MessagePublisher

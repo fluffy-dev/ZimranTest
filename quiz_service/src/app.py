@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.routers import attempts, health, quizzes
-from app.core import lifespan as _lifespan
-from app.core.config import settings
+from src import lifespan as _lifespan
+from src.config.project import settings
 from shared.exceptions import (
     AttemptAlreadyCompletedException,
     ConflictException,

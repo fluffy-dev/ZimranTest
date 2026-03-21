@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from app.db.session import engine
+from src.config.database.session import engine
 
 router = APIRouter(prefix="/health", tags=["Health"])
 
