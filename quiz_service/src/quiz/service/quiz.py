@@ -4,7 +4,7 @@ import uuid
 from typing import Any
 
 from src.config.redis import settings as redis_settings
-from app.dependencies.common import IRedis
+from src.dependencies.common import IRedis
 from src.quiz.dependencies.repository import IQuizRepository
 from src.quiz.dto import QuizDetailResponseDTO, QuizListResponseDTO, CreateQuizDTO
 from shared.exceptions import NotFoundException
