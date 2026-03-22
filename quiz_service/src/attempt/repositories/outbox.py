@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 
 from src.attempt.models.attempt import OutboxEvent
 from src.attempt.entities import OutboxEventEntity
-from src.config.database.session import AsyncSession
+from src.config.database.session import ISession
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ def _map_outbox_event(event: OutboxEvent) -> OutboxEventEntity:
 class OutboxRepository:
     """Handles Transactional Outbox event persistence returning pure domain entities."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: ISession) -> None:
         self._session = session
 
     async def insert_event(

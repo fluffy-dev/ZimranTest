@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.config.database.session import AsyncSession
+from src.config.database.session import ISession
 from src.balance.models.balance import Balance, BalanceTransaction
 from src.balance.entities import BalanceEntity, BalanceTransactionEntity
 from shared.logging import get_logger
@@ -35,7 +35,7 @@ def _map_txn_entity(db_obj: BalanceTransaction) -> BalanceTransactionEntity:
 
 
 class BalanceRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: ISession) -> None:
         self._session = session
 
     async def get_by_user_id(self, user_id: uuid.UUID) -> BalanceEntity | None:

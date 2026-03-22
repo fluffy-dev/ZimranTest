@@ -1,10 +1,6 @@
 from __future__ import annotations
-
-import uuid
 from typing import Annotated
-
 from fastapi import Depends
-
 from src.attempt.models.attempt import AttemptStatus
 from src.quiz.dependencies.repository import IQuizRepository
 from src.attempt.dependencies.repository import IAttemptRepository, IOutboxRepository
@@ -19,18 +15,16 @@ logger = get_logger(__name__)
 COINS_PER_CORRECT_ANSWER = 100
 QUIZ_REWARD_ROUTING_KEY = "quiz.questions.rewarded"
 
-IGradingService = Annotated[GradingService, Depends()]
-
 
 class AttemptService:
     """Orchestrates quiz submission flow utilizing distinct bounded domains."""
 
     def __init__(
         self,
-        quiz_repo: IQuizRepository,
         attempt_repo: IAttemptRepository,
+        quiz_repo: IQuizRepository,
         outbox_repo: IOutboxRepository,
-        grading_service: IGradingService,
+        grading_service: Annotated[GradingService, Depends()],
     ) -> None:
         self._quiz_repo = quiz_repo
         self._attempt_repo = attempt_repo

@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
-from src.config.database.session import AsyncSession
+from src.config.database.session import ISession
 from src.attempt.models.attempt import AttemptStatus, QuizAttempt, UserQuestionAnswer, UserRewardedQuestion
 from src.attempt.entities import QuizAttemptEntity
 from shared.logging import get_logger
@@ -29,7 +29,7 @@ def _map_attempt_entity(attempt: QuizAttempt) -> QuizAttemptEntity:
 class AttemptRepository:
     """Data access layer for quiz attempts mapping models to domain entities."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: ISession) -> None:
         self._session = session
 
     async def create_attempt(self, quiz_id: uuid.UUID, user_id: uuid.UUID) -> QuizAttemptEntity:

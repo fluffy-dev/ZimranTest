@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 
-from src.config.database.session import AsyncSession
+from src.config.database.session import ISession
 from src.quiz.models.quiz import Quiz, Question
 from src.quiz.entities import QuizEntity, QuestionEntity
 
@@ -35,7 +35,7 @@ class QuizRepository:
     Returns domain entities to decouple the database logic from business logic.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: ISession) -> None:
         self._session = session
 
     async def get_all_active(self, limit: int = 50, offset: int = 0) -> list[QuizEntity]:

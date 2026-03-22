@@ -1,6 +1,6 @@
 from __future__ import annotations
-
-from typing import Any
+from typing import Any, Annotated
+from fastapi import Depends
 
 from src.quiz.models.quiz import QuestionType
 from src.quiz.entities import QuestionEntity

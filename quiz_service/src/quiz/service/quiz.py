@@ -1,12 +1,10 @@
 from __future__ import annotations
-
 import uuid
 from typing import Any
-
-from src.config.redis import settings as redis_settings
-from src.dependencies.common import IRedis
 from src.quiz.dependencies.repository import IQuizRepository
 from src.quiz.dto import QuizDetailResponseDTO, QuizListResponseDTO, CreateQuizDTO
+from src.dependencies.common import IRedis
+from src.config.redis import settings as redis_settings
 from shared.exceptions import NotFoundException
 from shared.logging import get_logger
 
