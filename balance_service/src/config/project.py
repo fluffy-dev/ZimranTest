@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
 
 class Settings(BaseSettings):
+    """Application-level project configuration."""
     host: str = Field("0.0.0.0", alias="APP_HOST")
     port: int = Field(8000, alias="APP_PORT")
     debug: bool = Field(default=True, alias="APP_DEBUG")

@@ -1,16 +1,13 @@
-from pydantic import (
-    Field,
-    EmailStr,
-    AnyUrl,
-)
+from __future__ import annotations
 
+from pydantic import EmailStr, AnyUrl, Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    title: str = Field(
-        default="PROJECT_NAME", alias="APP_TITLE"
-    )  # TODO set project name
+    """OpenAPI / Swagger documentation configuration."""
+
+    title: str = Field(default="Finelo Balance Service", alias="APP_TITLE")
     description: str | None = Field(default=None, alias="APP_DESCRIPTION")
     summary: str | None = Field(None, alias="APP_SUMMARY")
     terms_of_service: str | None = Field(None, alias="APP_TERMS_OF_SERVICE")
@@ -19,20 +16,19 @@ class Settings(BaseSettings):
     licence_url: AnyUrl | None = Field(
         "https://rem.mit-license.org/license.txt", alias="APP_LICENSE_URL"
     )
-    contact_name: str | None = Field(
-        "John Doe", alias="APP_CONTACT_NAME"
-    )  # TODO set contact name
+    contact_name: str | None = Field("Finelo Team", alias="APP_CONTACT_NAME")
     contact_url: AnyUrl | None = Field(
-        "https://example.com", alias="APP_CONTACT_URL"
-    )  # TODO set contact url
+        "https://finelo.com", alias="APP_CONTACT_URL"
+    )
     contact_email: EmailStr | None = Field(
-        "John@Doe.com", alias="APP_CONTACT_EMAIL"
-    )  # TODO set contact email
+        "team@finelo.com", alias="APP_CONTACT_EMAIL"
+    )
     docs_url: str | None = Field("/docs", alias="APP_DOCS_URL")
-    redoc_url: str | None = Field("/redoc", alias="APP_REDOC_URL")  # noqa
+    redoc_url: str | None = Field("/redoc", alias="APP_REDOC_URL")
 
     @property
     def contact(self) -> dict:
+        """Builds the OpenAPI contact info dictionary."""
         return {
             "name": self.contact_name,
             "url": self.contact_url,
@@ -41,6 +37,7 @@ class Settings(BaseSettings):
 
     @property
     def license(self) -> dict:
+        """Builds the OpenAPI license info dictionary."""
         return {
             "name": self.licence_name,
             "url": self.licence_url,
