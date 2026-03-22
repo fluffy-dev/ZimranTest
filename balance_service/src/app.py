@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.balance.router import router as balance_router
+from src.health.router import router as health_router
 from src import lifespan as _lifespan
 from src.config.project import settings as project_settings
 from src.config.swagger import settings as swagger_settings
@@ -22,6 +23,7 @@ logger = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manages service startup and graceful shutdown lifecycle."""
     await _lifespan.startup()
     yield
     await _lifespan.shutdown()
@@ -55,7 +57,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
+    """Injects a correlation ID into every request for distributed tracing."""
     import uuid
+
     correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
     structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
     response = await call_next(request)
@@ -66,6 +70,7 @@ async def correlation_id_middleware(request: Request, call_next):
 
 @app.exception_handler(NotFoundException)
 async def not_found_handler(request: Request, exc: NotFoundException) -> JSONResponse:
+    """Returns 404 for domain-level not-found errors."""
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
         content={"error": {"code": exc.code, "message": exc.message}},
@@ -74,6 +79,7 @@ async def not_found_handler(request: Request, exc: NotFoundException) -> JSONRes
 
 @app.exception_handler(FineloBaseException)
 async def domain_error_handler(request: Request, exc: FineloBaseException) -> JSONResponse:
+    """Returns 500 for unhandled domain errors."""
     logger.error("Domain exception", code=exc.code, message=exc.message)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -83,6 +89,7 @@ async def domain_error_handler(request: Request, exc: FineloBaseException) -> JS
 
 @app.exception_handler(Exception)
 async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catches all unexpected errors and returns a generic 500 response."""
     logger.exception("Unexpected error", error=str(exc))
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -90,24 +97,5 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
     )
 
 
-@app.get("/health/live")
-async def liveness() -> dict:
-    return {"status": "ok"}
-
-
-@app.get("/health/ready")
-async def readiness() -> dict:
-    from sqlalchemy import text
-    from src.config.database.session import engine
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        return {"status": "ready", "checks": {"database": "ok"}}
-    except Exception as exc:
-        return JSONResponse(
-            {"status": "degraded", "checks": {"database": str(exc)}},
-            status_code=503,
-        )
-
-
+app.include_router(health_router)
 app.include_router(balance_router, prefix="/api/v1")
