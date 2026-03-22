@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
+
+from fastapi import Depends
 
 from src.attempt.models.attempt import AttemptStatus
 from src.quiz.dependencies.repository import IQuizRepository
@@ -16,6 +19,8 @@ logger = get_logger(__name__)
 COINS_PER_CORRECT_ANSWER = 100
 QUIZ_REWARD_ROUTING_KEY = "quiz.questions.rewarded"
 
+IGradingService = Annotated[GradingService, Depends()]
+
 
 class AttemptService:
     """Orchestrates quiz submission flow utilizing distinct bounded domains."""
@@ -25,7 +30,7 @@ class AttemptService:
         quiz_repo: IQuizRepository,
         attempt_repo: IAttemptRepository,
         outbox_repo: IOutboxRepository,
-        grading_service: GradingService,
+        grading_service: IGradingService,
     ) -> None:
         self._quiz_repo = quiz_repo
         self._attempt_repo = attempt_repo
@@ -49,19 +54,16 @@ class AttemptService:
         user_id: uuid.UUID,
         request: SubmitAttemptDTO,
     ) -> AttemptResultResponseDTO:
-        # 1. Load & validate
         attempt = await self._attempt_repo.get_by_id(attempt_id)
         if attempt is None or attempt.user_id != user_id:
             raise NotFoundException(f"Attempt {attempt_id} not found.")
         if attempt.status == AttemptStatus.COMPLETED:
             raise AttemptAlreadyCompletedException(f"Attempt {attempt_id} is already completed.")
 
-        # 2. Load questions
         question_ids = [a.question_id for a in request.answers]
         questions = await self._quiz_repo.get_questions_by_ids(question_ids)
         question_map = {q.id: q for q in questions}
 
-        # 3. Grade
         graded: list[tuple[uuid.UUID, dict, bool]] = []
         for ans in request.answers:
             question = question_map.get(ans.question_id)
@@ -70,7 +72,6 @@ class AttemptService:
             is_correct = self._grading.check_answer(question, ans.answer_payload)
             graded.append((ans.question_id, ans.answer_payload, is_correct))
 
-        # 4. Determine new rewards
         correct_ids = [qid for qid, _, correct in graded if correct]
         already_rewarded = await self._attempt_repo.get_already_rewarded_question_ids(
             user_id=user_id, question_ids=correct_ids
@@ -78,7 +79,6 @@ class AttemptService:
         newly_rewarded_ids = [qid for qid in correct_ids if qid not in already_rewarded]
         coins_to_award = len(newly_rewarded_ids) * COINS_PER_CORRECT_ANSWER
 
-        # 5. Atomic DB writes
         await self._attempt_repo.bulk_save_answers(attempt_id, graded)
         await self._attempt_repo.bulk_insert_rewarded_questions(
             user_id=user_id, question_ids=newly_rewarded_ids
@@ -120,9 +120,3 @@ class AttemptService:
                 for qid, _, is_correct in graded
             ],
         )
-
-    async def get_attempt_result(self, attempt_id: uuid.UUID) -> AttemptResultResponseDTO:
-        # Mock logic. To match tests exactly. Wait, in old logic get_attempt_result returned attempt model directly,
-        # but the router mapped it. Actually, wait, get_attempt_result isn't used much? 
-        # Attempt submission returns the result directly. Let's just return what the old method did (if needed)
-        pass 
