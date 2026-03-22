@@ -50,7 +50,6 @@ app = FastAPI(
     default_response_class=JSONResponse,
 )
 
-# ── Middleware ──────────────────────────────────────────────────────────────
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,7 +64,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
+    """Injects a correlation ID into every request for distributed tracing."""
     import uuid
+
     correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
     structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
     response = await call_next(request)
@@ -74,10 +75,10 @@ async def correlation_id_middleware(request: Request, call_next):
     return response
 
 
-# ── Exception Handlers ──────────────────────────────────────────────────────
 
 @app.exception_handler(NotFoundException)
 async def not_found_handler(request: Request, exc: NotFoundException) -> JSONResponse:
+    """Returns 404 for domain-level not-found errors."""
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
         content={"error": {"code": exc.code, "message": exc.message}},
@@ -86,6 +87,7 @@ async def not_found_handler(request: Request, exc: NotFoundException) -> JSONRes
 
 @app.exception_handler(ConflictException)
 async def conflict_handler(request: Request, exc: ConflictException) -> JSONResponse:
+    """Returns 409 for state conflict errors."""
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content={"error": {"code": exc.code, "message": exc.message}},
@@ -94,6 +96,7 @@ async def conflict_handler(request: Request, exc: ConflictException) -> JSONResp
 
 @app.exception_handler(ValidationException)
 async def validation_handler(request: Request, exc: ValidationException) -> JSONResponse:
+    """Returns 422 for business validation errors."""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"error": {"code": exc.code, "message": exc.message}},
@@ -102,6 +105,7 @@ async def validation_handler(request: Request, exc: ValidationException) -> JSON
 
 @app.exception_handler(FineloBaseException)
 async def domain_error_handler(request: Request, exc: FineloBaseException) -> JSONResponse:
+    """Returns 500 for unhandled domain errors."""
     logger.error("Unhandled domain exception", code=exc.code, message=exc.message)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -111,6 +115,7 @@ async def domain_error_handler(request: Request, exc: FineloBaseException) -> JS
 
 @app.exception_handler(Exception)
 async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catches all unexpected errors and returns a generic 500 response."""
     logger.exception("Unexpected error", error=str(exc))
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -118,7 +123,6 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
     )
 
 
-# ── Routers ─────────────────────────────────────────────────────────────────
 
 app.include_router(health_router)
 app.include_router(quizzes_router, prefix="/api/v1")

@@ -9,7 +9,7 @@ from src.config.redis import settings as redis_settings
 from src.config.rabbitmq import settings as rmq_settings
 from src.config.outbox import settings as outbox_settings
 from src.config.database.session import AsyncSessionFactory
-from app.repositories.outbox_repository import OutboxRepository
+from src.attempt.repositories.outbox import OutboxRepository
 from shared.logging import get_logger
 from shared.messaging import MessagePublisher
 from shared.messaging.rabbitmq import RabbitMQPublisher

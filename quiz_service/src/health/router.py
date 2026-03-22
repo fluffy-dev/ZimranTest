@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from src.config.database.session import engine
+from src.config.database.engine import db_helper
 
 router = APIRouter(prefix="/health", tags=["Health"])
 
@@ -15,13 +15,13 @@ async def liveness() -> dict:
 
 @router.get("/ready", summary="Readiness probe (checks DB + Redis)")
 async def readiness() -> dict:
-    from app.core.lifespan import redis_client
+    from src.lifespan import redis_client
 
     results: dict[str, str] = {}
 
     # Check DB
     try:
-        async with engine.connect() as conn:
+        async with db_helper.engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         results["database"] = "ok"
     except Exception as exc:

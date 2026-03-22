@@ -15,7 +15,7 @@ ISession = Annotated[AsyncSession, Depends(db_helper.get_session)]
 
 
 def _get_redis() -> aioredis.Redis:
-    from app.core.lifespan import redis_client
+    from src.lifespan import redis_client
 
     return redis_client
 
