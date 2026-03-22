@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -13,7 +13,7 @@ class EventEnvelope(BaseModel):
     event_id: uuid.UUID = Field(default_factory=uuid.uuid4)
     event_type: str
     schema_version: str = "1.0"
-    occurred_at: datetime = Field(default_factory=datetime.utcnow)
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
     payload: dict[str, Any]
 
 
