@@ -14,6 +14,7 @@ from src import lifespan as _lifespan
 from src.config.project import settings as project_settings
 from src.config.swagger import settings as swagger_settings
 from src.config.cors import settings as cors_settings
+from src.dependencies.common import HEADERS
 from shared.exceptions import FineloBaseException, NotFoundException
 from shared.logging import configure_logging
 
@@ -60,10 +61,11 @@ async def correlation_id_middleware(request: Request, call_next):
     """Injects a correlation ID into every request for distributed tracing."""
     import uuid
 
-    correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
+    h_name = HEADERS.CORRELATION_ID
+    correlation_id = request.headers.get(h_name, str(uuid.uuid4()))
     structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
     response = await call_next(request)
-    response.headers["X-Correlation-ID"] = correlation_id
+    response.headers[h_name] = correlation_id
     structlog.contextvars.unbind_contextvars("correlation_id")
     return response
 
@@ -73,7 +75,13 @@ async def not_found_handler(request: Request, exc: NotFoundException) -> JSONRes
     """Returns 404 for domain-level not-found errors."""
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
-        content={"error": {"code": exc.code, "message": exc.message}},
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "correlation_id": structlog.contextvars.get_contextvars().get("correlation_id"),
+            }
+        },
     )
 
 
@@ -83,7 +91,13 @@ async def domain_error_handler(request: Request, exc: FineloBaseException) -> JS
     logger.error("Domain exception", code=exc.code, message=exc.message)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"error": {"code": exc.code, "message": exc.message}},
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "correlation_id": structlog.contextvars.get_contextvars().get("correlation_id"),
+            }
+        },
     )
 
 
@@ -93,7 +107,13 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
     logger.exception("Unexpected error", error=str(exc))
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"error": {"code": "InternalServerError", "message": "An unexpected error occurred."}},
+        content={
+            "error": {
+                "code": "InternalServerError",
+                "message": "An unexpected error occurred.",
+                "correlation_id": structlog.contextvars.get_contextvars().get("correlation_id"),
+            }
+        },
     )
 
 
