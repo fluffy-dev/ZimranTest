@@ -1,11 +1,14 @@
 from __future__ import annotations
-from typing import Annotated
-from fastapi import Depends
-from src.attempt.models.attempt import AttemptStatus
+
+import uuid
+
 from src.quiz.dependencies.repository import IQuizRepository
+
+from src.attempt.models.attempt import AttemptStatus
 from src.attempt.dependencies.repository import IAttemptRepository, IOutboxRepository
-from src.attempt.service.grading import GradingService
+from src.attempt.dependencies.grading_service import IGradingService
 from src.attempt.dto import AttemptResultResponseDTO, QuestionResultItemDTO, SubmitAttemptDTO, AttemptStartResponseDTO
+
 from shared.exceptions import AttemptAlreadyCompletedException, NotFoundException
 from shared.logging import get_logger
 from shared.schemas import QuizRewardEvent, QuizRewardPayload
@@ -24,7 +27,7 @@ class AttemptService:
         attempt_repo: IAttemptRepository,
         quiz_repo: IQuizRepository,
         outbox_repo: IOutboxRepository,
-        grading_service: Annotated[GradingService, Depends()],
+        grading_service: IGradingService,
     ) -> None:
         self._quiz_repo = quiz_repo
         self._attempt_repo = attempt_repo

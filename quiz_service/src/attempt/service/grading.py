@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import Any, Annotated
-from fastapi import Depends
+from typing import Any
 
 from src.quiz.models.quiz import QuestionType
 from src.quiz.entities import QuestionEntity
@@ -78,3 +77,4 @@ class GradingService:
             p["pair_id"]: p["matched_pair_id"] for p in answer["pairs"]
         }
         return correct_pairs == user_pairs
+
