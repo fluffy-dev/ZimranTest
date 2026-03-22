@@ -21,11 +21,11 @@ AsyncRabbitMQPublisher = RabbitMQPublisher
 AsyncRabbitMQConsumer = RabbitMQConsumer
 
 __all__ = [
-    """Abstract interface — always import these in type annotations."""
+    # Abstract interface — always import these in type annotations
     "MessagePublisher",
     "MessageConsumer",
     "MessageHandler",
-    """Concrete adapters."""
+    # Concrete adapters
     "RabbitMQPublisher",
     "RabbitMQConsumer",
     "KafkaPublisher",
