@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
-@dataclass
+@dataclass(slots=True)
 class BalanceEntity:
     """Domain representation of a user's virtual coin balance.
 
@@ -30,7 +30,7 @@ class BalanceEntity:
     updated_at: datetime
 
 
-@dataclass
+@dataclass(slots=True)
 class BalanceTransactionEntity:
     """Domain representation of an immutable ledger entry for a balance change.
 

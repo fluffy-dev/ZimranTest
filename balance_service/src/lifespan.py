@@ -32,7 +32,18 @@ async def startup() -> None:
     _consumer_task = asyncio.create_task(
         _consumer.consume(handle_quiz_reward_message)
     )
+    _consumer_task.add_done_callback(_on_consumer_done)
     logger.info("RabbitMQ consumer started", queue=rmq_settings.queue)
+
+
+def _on_consumer_done(task: asyncio.Task) -> None:
+    """Callback triggered if the consumer task finishes (usually an error)."""
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        logger.info("Consumer task cancelled")
+    except Exception as exc:
+        logger.exception("Consumer task failed unexpectedly", error=str(exc))
 
 
 async def shutdown() -> None:

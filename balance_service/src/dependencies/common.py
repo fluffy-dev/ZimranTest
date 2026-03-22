@@ -4,7 +4,14 @@ from typing import Annotated
 from fastapi import Depends, Header
 from fastapi.exceptions import HTTPException
 
-def _get_user_id(x_user_id: str = Header(..., alias="X-User-ID")) -> uuid.UUID:
+class HEADERS:
+    """Standard HTTP header names used across the platform."""
+
+    USER_ID = "X-User-ID"
+    CORRELATION_ID = "X-Correlation-ID"
+
+
+def _get_user_id(x_user_id: str = Header(..., alias=HEADERS.USER_ID)) -> uuid.UUID:
     """Extract and validate the caller's UUID from the ``X-User-ID`` request header.
 
     The header is mandatory. Requests that omit it will receive a ``422``
