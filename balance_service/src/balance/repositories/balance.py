@@ -14,6 +14,14 @@ logger = get_logger(__name__)
 
 
 def _map_balance_entity(db_obj: Balance) -> BalanceEntity:
+    """Convert a :class:`Balance` ORM instance to a :class:`BalanceEntity`.
+
+    Args:
+        db_obj: A hydrated SQLAlchemy ``Balance`` model retrieved from the DB.
+
+    Returns:
+        A :class:`BalanceEntity` dataclass populated with the ORM object's data.
+    """
     return BalanceEntity(
         id=db_obj.id,
         user_id=db_obj.user_id,
@@ -23,6 +31,16 @@ def _map_balance_entity(db_obj: Balance) -> BalanceEntity:
 
 
 def _map_txn_entity(db_obj: BalanceTransaction) -> BalanceTransactionEntity:
+    """Convert a :class:`BalanceTransaction` ORM instance to a :class:`BalanceTransactionEntity`.
+
+    Args:
+        db_obj: A hydrated SQLAlchemy ``BalanceTransaction`` model retrieved
+            from the DB.
+
+    Returns:
+        A :class:`BalanceTransactionEntity` dataclass populated with the ORM
+        object's data.
+    """
     return BalanceTransactionEntity(
         id=db_obj.id,
         user_id=db_obj.user_id,
@@ -35,10 +53,41 @@ def _map_txn_entity(db_obj: BalanceTransaction) -> BalanceTransactionEntity:
 
 
 class BalanceRepository:
+    """Data-access layer for balance and transaction records.
+
+    All SQL operations are executed through the injected async SQLAlchemy
+    session (``ISession``). The repository is responsible for:
+
+    - Fetching a user's current balance.
+    - Atomically inserting a transaction and upserting the aggregate balance,
+      with full idempotency (duplicate events are silently skipped).
+    - Retrieving a paginated, newest-first list of transactions.
+
+    The repository does **not** commit the session; that responsibility belongs
+    to the caller (router via FastAPI dependency injection or consumer via
+    ``session.begin()``).
+    """
+
     def __init__(self, session: ISession) -> None:
+        """Initialise the repository with an async SQLAlchemy session.
+
+        Args:
+            session: An active ``AsyncSession`` bound to the current unit of
+                work. Typically injected by FastAPI's dependency system or
+                provided via ``db_helper.get_db_session()`` in the consumer.
+        """
         self._session = session
 
     async def get_by_user_id(self, user_id: uuid.UUID) -> BalanceEntity | None:
+        """Fetch the balance record for a given user.
+
+        Args:
+            user_id: The UUID identifying the user whose balance to retrieve.
+
+        Returns:
+            A :class:`BalanceEntity` if a balance record exists, or ``None``
+            if the user has never been credited.
+        """
         result = await self._session.execute(
             select(Balance).where(Balance.user_id == user_id)
         )
@@ -52,7 +101,95 @@ class BalanceRepository:
         idempotency_key: uuid.UUID,
         description: str | None = None,
     ) -> BalanceEntity:
-        txn_stmt = (
+        """Atomically record a credit transaction and update the aggregate balance.
+
+        Guarantees exactly-once semantics: if ``idempotency_key`` has already
+        been used the transaction insert is skipped and the current balance is
+        returned unchanged.
+
+        Args:
+            user_id: The UUID of the user to credit.
+            amount: Number of coins to add (``>= 0``).
+            idempotency_key: Unique key (usually the upstream event UUID) that
+                prevents double-application of the same credit.
+            description: Optional human-readable annotation stored on the
+                transaction record.
+
+        Returns:
+            The updated (or unchanged, for duplicates) :class:`BalanceEntity`.
+        """
+        is_new = await self._try_insert_transaction(
+            user_id=user_id,
+            amount=amount,
+            idempotency_key=idempotency_key,
+            description=description,
+        )
+
+        if not is_new:
+            logger.info(
+                "Duplicate idempotency key — skipping credit",
+                idempotency_key=str(idempotency_key),
+                user_id=str(user_id),
+            )
+            return await self._get_or_create_zero_balance(user_id)
+
+        balance = await self._apply_balance_credit(user_id=user_id, amount=amount)
+
+        logger.info(
+            "Balance credited",
+            user_id=str(user_id),
+            amount=amount,
+            new_balance=balance.amount,
+            idempotency_key=str(idempotency_key),
+        )
+        return balance
+
+    async def get_transactions(
+        self, user_id: uuid.UUID, limit: int = 50, offset: int = 0
+    ) -> list[BalanceTransactionEntity]:
+        """Retrieve a paginated, newest-first list of transactions for a user.
+
+        Args:
+            user_id: The UUID of the user whose transactions to retrieve.
+            limit: Maximum number of rows to return. Defaults to ``50``.
+            offset: Number of rows to skip (for pagination). Defaults to ``0``.
+
+        Returns:
+            A list of :class:`BalanceTransactionEntity` objects ordered by
+            ``created_at DESC``. Returns an empty list if no transactions exist.
+        """
+        result = await self._session.execute(
+            select(BalanceTransaction)
+            .where(BalanceTransaction.user_id == user_id)
+            .order_by(BalanceTransaction.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return [_map_txn_entity(obj) for obj in result.scalars().all()]
+
+    async def _try_insert_transaction(
+        self,
+        user_id: uuid.UUID,
+        amount: int,
+        idempotency_key: uuid.UUID,
+        description: str | None,
+    ) -> bool:
+        """Attempt to insert a transaction row, skipping silently on duplicates.
+
+        Uses ``INSERT … ON CONFLICT DO NOTHING`` on ``idempotency_key`` so that
+        re-delivering the same event never creates a second ledger entry.
+
+        Args:
+            user_id: Owner of the transaction.
+            amount: Coin amount involved in the transaction.
+            idempotency_key: Unique key guarding against duplicate inserts.
+            description: Optional annotation attached to the record.
+
+        Returns:
+            ``True`` if the row was newly inserted, ``False`` if it already
+            existed (duplicate event).
+        """
+        stmt = (
             pg_insert(BalanceTransaction)
             .values(
                 user_id=user_id,
@@ -64,25 +201,26 @@ class BalanceRepository:
             .on_conflict_do_nothing(index_elements=["idempotency_key"])
             .returning(BalanceTransaction.id)
         )
-        txn_result = await self._session.execute(txn_stmt)
-        inserted_txn_id = txn_result.scalar_one_or_none()
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none() is not None
 
-        if inserted_txn_id is None:
-            logger.info(
-                "Duplicate idempotency key — skipping credit",
-                idempotency_key=str(idempotency_key),
-                user_id=str(user_id),
-            )
-            balance = await self.get_by_user_id(user_id)
-            if balance is None:
-                # Edge case: transaction exists but balance doesn't (shouldn't happen)
-                new_balance = Balance(user_id=user_id, amount=0)
-                self._session.add(new_balance)
-                await self._session.flush()
-                balance = _map_balance_entity(new_balance)
-            return balance
+    async def _apply_balance_credit(
+        self, user_id: uuid.UUID, amount: int
+    ) -> BalanceEntity:
+        """Upsert the aggregate balance by adding ``amount`` to the current total.
 
-        balance_stmt = (
+        Creates the balance row on first credit; increments it on subsequent
+        ones. Uses ``INSERT … ON CONFLICT DO UPDATE`` for an atomic upsert
+        without a separate SELECT.
+
+        Args:
+            user_id: Owner of the balance to update.
+            amount: Number of coins to add.
+
+        Returns:
+            The updated :class:`BalanceEntity` reflecting the new total.
+        """
+        stmt = (
             pg_insert(Balance)
             .values(user_id=user_id, amount=amount)
             .on_conflict_do_update(
@@ -91,27 +229,30 @@ class BalanceRepository:
             )
             .returning(Balance)
         )
-        result = await self._session.execute(balance_stmt)
+        result = await self._session.execute(stmt)
         balance = result.scalar_one()
         await self._session.flush()
-
-        logger.info(
-            "Balance credited",
-            user_id=str(user_id),
-            amount=amount,
-            new_balance=balance.amount,
-            idempotency_key=str(idempotency_key),
-        )
         return _map_balance_entity(balance)
 
-    async def get_transactions(
-        self, user_id: uuid.UUID, limit: int = 50, offset: int = 0
-    ) -> list[BalanceTransactionEntity]:
-        result = await self._session.execute(
-            select(BalanceTransaction)
-            .where(BalanceTransaction.user_id == user_id)
-            .order_by(BalanceTransaction.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        return [_map_txn_entity(obj) for obj in result.scalars().all()]
+    async def _get_or_create_zero_balance(self, user_id: uuid.UUID) -> BalanceEntity:
+        """Return the existing balance or create a zero-value one if absent.
+
+        This handles a rare but theoretically possible race condition: a
+        duplicate transaction exists in the ledger but the aggregate balance
+        row has not been written yet (e.g. a previous write partially failed).
+
+        Args:
+            user_id: Owner of the balance to look up or create.
+
+        Returns:
+            The existing or newly-created zero :class:`BalanceEntity`.
+        """
+        balance = await self.get_by_user_id(user_id)
+        if balance is not None:
+            return balance
+
+        # Edge case: transaction exists but balance row is missing.
+        new_balance = Balance(user_id=user_id, amount=0)
+        self._session.add(new_balance)
+        await self._session.flush()
+        return _map_balance_entity(new_balance)
