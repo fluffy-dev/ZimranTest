@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ── Infrastructure ─────────────────────────────────────────────────────────
 
@@ -127,14 +125,9 @@ services:
     container_name: finelo_quiz_service
     restart: unless-stopped
     ports:
-      - "8000:8000"
-    environment:
-      APP_NAME: quiz-service
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@quiz_db:5432/quiz_db
-      REDIS_URL: redis://redis:6379/0
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      LOG_LEVEL: INFO
-      DEBUG: "false"
+      - "8002:8000"
+    env_file:
+      - ./quiz_service/.env
     depends_on:
       quiz_db:
         condition: service_healthy
@@ -159,12 +152,8 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
-    environment:
-      APP_NAME: balance-service
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@balance_db:5432/balance_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      LOG_LEVEL: INFO
-      DEBUG: "false"
+    env_file:
+      - ./balance_service/.env
     depends_on:
       balance_db:
         condition: service_healthy
