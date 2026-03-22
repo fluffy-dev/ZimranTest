@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import json
-# Standard library built-in typings used natively
+from typing import Any
 
 from pydantic import Field
 from pydantic.fields import FieldInfo
-
 from pydantic_settings import (
     BaseSettings,
     EnvSettingsSource,
@@ -12,9 +13,11 @@ from pydantic_settings import (
 
 
 class MyCustomSource(EnvSettingsSource):
+    """Parses comma-separated environment values into Python lists."""
+
     def prepare_field_value(
-        self, field_name: str, field: FieldInfo, value: any, value_is_complex: bool
-    ) -> any:
+        self, field_name: str, field: FieldInfo, value: Any, value_is_complex: bool
+    ) -> Any:
         if field_name in [
             "allow_origins",
             "allow_methods",
@@ -27,6 +30,8 @@ class MyCustomSource(EnvSettingsSource):
 
 
 class Settings(BaseSettings):
+    """CORS middleware configuration loaded from environment variables."""
+
     allow_origins: list[str] = Field(default=["*"], alias="CORS_ALLOW_ORIGINS")
     allow_methods: list[str] = Field(default=["GET"], alias="CORS_ALLOW_METHODS")
     allow_headers: list[str] = Field(default=["*"], alias="CORS_ALLOW_HEADERS")
@@ -48,3 +53,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
