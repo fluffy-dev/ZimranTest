@@ -46,7 +46,7 @@ def configure_logging(service_name: str, log_level: str = "INFO") -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(log_level.upper())
 
-    # Bind service name to all logs in this process
+    """Bind service name to all logs in this process."""
     structlog.contextvars.bind_contextvars(service=service_name)
 
 
