@@ -21,7 +21,7 @@ class QuestionOutDTO(BaseModel):
     type: str
     order_index: int
     text: str | None
-    payload: dict[str, Any]  # correct answers stripped server-side
+    payload: dict[str, Any]
 
 
 class QuizDetailResponseDTO(BaseModel):
