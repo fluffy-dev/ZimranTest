@@ -52,7 +52,6 @@ class BalanceRepository:
         idempotency_key: uuid.UUID,
         description: str | None = None,
     ) -> BalanceEntity:
-        # Step 1: Insert transaction
         txn_stmt = (
             pg_insert(BalanceTransaction)
             .values(
@@ -83,7 +82,6 @@ class BalanceRepository:
                 balance = _map_balance_entity(new_balance)
             return balance
 
-        # Step 2: Upsert balance
         balance_stmt = (
             pg_insert(Balance)
             .values(user_id=user_id, amount=amount)
