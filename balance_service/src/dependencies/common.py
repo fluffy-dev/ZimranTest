@@ -1,5 +1,6 @@
 import uuid
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Header
 from fastapi.exceptions import HTTPException
@@ -38,7 +39,7 @@ def _get_user_id(x_user_id: str = Header(..., alias=HEADERS.USER_ID)) -> uuid.UU
             detail="Invalid X-User-ID: must be a valid UUID.",
         )
 
-IUserID = Annotated[uuid.UUID, Depends(_get_user_id)]
+IUserID: type[UUID] = Annotated[uuid.UUID, Depends(_get_user_id)]
 """FastAPI-injected caller UUID resolved from the ``X-User-ID`` header.
 
 Usage::
