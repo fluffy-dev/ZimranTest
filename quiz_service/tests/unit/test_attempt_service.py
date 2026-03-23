@@ -6,17 +6,18 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.attempt.models.attempt import AttemptStatus
+from src.attempt.enum import AttemptStatusEnum
 from src.quiz.models.quiz import QuestionType
 from src.attempt.dto import SubmitAttemptDTO, AnswerItemDTO
-from src.attempt.service.attempt import AttemptService, COINS_PER_CORRECT_ANSWER
+from src.attempt.service.attempt import AttemptService
+from src.config.project import settings
 from src.attempt.service.grading import GradingService
 
 
 def make_attempt(
     quiz_id: uuid.UUID | None = None,
     user_id: uuid.UUID | None = None,
-    status: str = AttemptStatus.IN_PROGRESS,
+    status: str = AttemptStatusEnum.IN_PROGRESS,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid.uuid4(),
@@ -80,7 +81,7 @@ class TestSubmitAttempt:
         mock_attempt_repo.bulk_save_answers.return_value = None
 
         completed = make_attempt(user_id=user_id)
-        completed.status = AttemptStatus.COMPLETED
+        completed.status = AttemptStatusEnum.COMPLETED
         completed.score = 2
         completed.total_questions = 2
         mock_attempt_repo.complete_attempt.return_value = completed
@@ -98,7 +99,7 @@ class TestSubmitAttempt:
 
         assert result.score == 2
         assert result.total_questions == 2
-        assert result.coins_awarded == 2 * COINS_PER_CORRECT_ANSWER
+        assert result.coins_awarded == 2 * settings.quiz_coins_per_correct_answer
 
     async def test_no_reward_for_already_rewarded_question(
         self, service, mock_quiz_repo, mock_attempt_repo, mock_outbox_repo
@@ -113,7 +114,7 @@ class TestSubmitAttempt:
         mock_attempt_repo.bulk_save_answers.return_value = None
 
         completed = make_attempt(user_id=user_id)
-        completed.status = AttemptStatus.COMPLETED
+        completed.status = AttemptStatusEnum.COMPLETED
         completed.score = 1
         completed.total_questions = 1
         mock_attempt_repo.complete_attempt.return_value = completed
@@ -137,7 +138,7 @@ class TestSubmitAttempt:
         from shared.exceptions import AttemptAlreadyCompletedException
 
         user_id = uuid.uuid4()
-        attempt = make_attempt(user_id=user_id, status=AttemptStatus.COMPLETED)
+        attempt = make_attempt(user_id=user_id, status=AttemptStatusEnum.COMPLETED)
         mock_attempt_repo.get_by_id.return_value = attempt
 
         request = SubmitAttemptDTO(

@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter
 
 from src.dependencies.common import IUserID
-from src.attempt.dependencies.service import IAttemptService
+from src.attempt.dependencies.attempt_service import IAttemptService
 from src.attempt.dto import AttemptStartResponseDTO, AttemptResultResponseDTO, SubmitAttemptDTO
 
 router = APIRouter(prefix="/attempts", tags=["Attempts"])

@@ -1,3 +1,4 @@
+from src.attempt.enum import AttemptStatusEnum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,11 +7,14 @@ from typing import Any
 
 @dataclass
 class QuizAttemptEntity:
-    """Domain representation of a user's attempt at a quiz."""
+    """
+    Domain entity representing a user's attempt at a quiz.
+    Decoupled from the database model, used within the service layer.
+    """
     id: uuid.UUID
     quiz_id: uuid.UUID
     user_id: uuid.UUID
-    status: str
+    status: AttemptStatusEnum
     score: int | None
     total_questions: int | None
     started_at: datetime
@@ -19,7 +23,10 @@ class QuizAttemptEntity:
 
 @dataclass
 class OutboxEventEntity:
-    """Domain representation of a transactional outbox event."""
+    """
+    Domain entity representing a transactional outbox event.
+    Contains the event metadata and JSON-serializable payload.
+    """
     id: uuid.UUID
     event_type: str
     routing_key: str

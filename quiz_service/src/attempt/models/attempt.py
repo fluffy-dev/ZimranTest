@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from enum import Enum
 from typing import Any
 
 from sqlalchemy import (
@@ -18,16 +17,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.libs.base_model import Base
 from src.quiz.models.quiz import Question, Quiz
-
-
-class AttemptStatus(str, Enum):
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    ABANDONED = "abandoned"
+from src.attempt.enum import AttemptStatusEnum
 
 
 class QuizAttempt(Base):
-    """Tracks one user's attempt at a quiz."""
+    """
+    SQLAlchemy model tracking a single user's attempt at a quiz.
+    Stores metadata like status, score, and timestamps.
+    """
 
     __tablename__ = "quiz_attempts"
 
@@ -38,8 +35,8 @@ class QuizAttempt(Base):
         UUID(as_uuid=True), ForeignKey("quizzes.id"), nullable=False
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(20), default=AttemptStatus.IN_PROGRESS, nullable=False
+    status: Mapped[AttemptStatusEnum] = mapped_column(
+        String(20), default=AttemptStatusEnum.IN_PROGRESS, nullable=False
     )
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_questions: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -63,7 +60,10 @@ class QuizAttempt(Base):
 
 
 class UserQuestionAnswer(Base):
-    """Stores a user's answer to one question within an attempt."""
+    """
+    SQLAlchemy model storing a user's specific answer to a question within an attempt.
+    Captures the response payload and correctness.
+    """
 
     __tablename__ = "user_question_answers"
 
@@ -92,8 +92,8 @@ class UserQuestionAnswer(Base):
 
 class UserRewardedQuestion(Base):
     """
-    Records which questions a user has already been rewarded for answering correctly.
-    Composite PK (user_id, question_id) provides natural idempotency.
+    SQLAlchemy model recording questions for which a user has already received rewards.
+    Uses a composite primary key (user_id, question_id) for idempotency.
     """
 
     __tablename__ = "user_rewarded_questions"
@@ -111,8 +111,8 @@ class UserRewardedQuestion(Base):
 
 class OutboxEvent(Base):
     """
-    Transactional Outbox table.
-    Events are written atomically with business data in the same DB transaction.
+    SQLAlchemy model for the Transactional Outbox pattern.
+    Stores events that need to be published to external systems (e.g., RabbitMQ).
     """
 
     __tablename__ = "outbox_events"
