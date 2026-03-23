@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Annotated
+from uuid import UUID
 
 import redis.asyncio as aioredis
 from fastapi import Depends, Header
@@ -34,7 +35,7 @@ def _get_user_id(x_user_id: str = Header(..., alias="X-User-ID")) -> uuid.UUID:
         )
 
 
-IUserID = Annotated[uuid.UUID, Depends(_get_user_id)]
+IUserID: type[UUID] = Annotated[uuid.UUID, Depends(_get_user_id)]
 
 
 def _get_locale(accept_language: str = Header(default="en")) -> str:

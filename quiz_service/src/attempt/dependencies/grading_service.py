@@ -3,4 +3,4 @@ from fastapi import Depends
 
 from src.attempt.service.grading import GradingService
 
-IGradingService = Annotated[GradingService, Depends()]
+IGradingService: type[GradingService] = Annotated[GradingService, Depends()]
