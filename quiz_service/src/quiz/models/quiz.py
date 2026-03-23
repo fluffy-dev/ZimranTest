@@ -41,7 +41,8 @@ class Quiz(TimestampMixin, Base):
 
 class Question(TimestampMixin, Base):
     """
-    A quiz question. Type-specific data is stored in JSONB payload.
+    SQLAlchemy model representing a Quiz Question.
+    Type-specific data is stored in JSONB payload.
 
     Payload shapes:
     - single_choice:   {"options": [{"id": str, "text": {locale: str}}, ...], "correct_id": str}

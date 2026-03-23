@@ -24,9 +24,13 @@ def _map_outbox_event(event: OutboxEvent) -> OutboxEventEntity:
 
 
 class OutboxRepository:
-    """Handles Transactional Outbox event persistence returning pure domain entities."""
+    """
+    Data access layer for Transactional Outbox events.
+    Ensures that events are persisted along with business data for reliable delivery.
+    """
 
     def __init__(self, session: ISession) -> None:
+        """Initializes the repository with a database session."""
         self._session = session
 
     async def insert_event(
@@ -36,6 +40,18 @@ class OutboxRepository:
         routing_key: str,
         payload: dict[str, Any],
     ) -> OutboxEventEntity:
+        """
+        Inserts a new event into the outbox table.
+
+        Args:
+            event_id: Unique identifier for the event.
+            event_type: Categorization of the event (e.g., 'quiz.rewarded').
+            routing_key: The destination topic or queue identifier.
+            payload: The actual data content of the event.
+
+        Returns:
+            OutboxEventEntity: The persisted event domain entity.
+        """
         event = OutboxEvent(
             id=event_id,
             event_type=event_type,
@@ -47,6 +63,15 @@ class OutboxRepository:
         return _map_outbox_event(event)
 
     async def get_pending_events(self, batch_size: int = 50) -> list[OutboxEventEntity]:
+        """
+        Retrieves events that have not yet been published.
+
+        Args:
+            batch_size: Maximum number of events to retrieve in one call.
+
+        Returns:
+            list[OutboxEventEntity]: A list of pending event entities.
+        """
         result = await self._session.execute(
             select(OutboxEvent)
             .where(OutboxEvent.published_at.is_(None))
@@ -56,6 +81,12 @@ class OutboxRepository:
         return [_map_outbox_event(e) for e in result.scalars().all()]
 
     async def mark_published(self, event_id: uuid.UUID) -> None:
+        """
+        Marks an event as successfully published by setting the 'published_at' timestamp.
+
+        Args:
+            event_id: Unique identifier of the event.
+        """
         from datetime import datetime, timezone
         await self._session.execute(
             update(OutboxEvent)
@@ -65,6 +96,12 @@ class OutboxRepository:
         await self._session.commit()
 
     async def increment_attempts(self, event_id: uuid.UUID) -> None:
+        """
+        Increments the retry counter for a failed event publication attempt.
+
+        Args:
+            event_id: Unique identifier of the event.
+        """
         await self._session.execute(
             update(OutboxEvent)
             .where(OutboxEvent.id == event_id)
