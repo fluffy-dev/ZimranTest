@@ -2,7 +2,11 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class QuizSummaryItemDTO(BaseModel):
+class QuizListItemDTO(BaseModel):
+    """
+    DTO for a single quiz item in a list results.
+    Provides brief metadata and question count.
+    """
     id: str
     title: str | None
     description: str | None
@@ -10,13 +14,21 @@ class QuizSummaryItemDTO(BaseModel):
 
 
 class QuizListResponseDTO(BaseModel):
-    items: list[QuizSummaryItemDTO]
+    """
+    DTO for the paginated list of quizzes response.
+    Includes items and pagination metadata.
+    """
+    items: list[QuizListItemDTO]
     total: int
     page: int
     page_size: int
 
 
-class QuestionOutDTO(BaseModel):
+class QuestionDetailDTO(BaseModel):
+    """
+    DTO for detailed information about a single question.
+    Contains the localized text and payload for display.
+    """
     id: str
     type: str
     order_index: int
@@ -25,13 +37,21 @@ class QuestionOutDTO(BaseModel):
 
 
 class QuizDetailResponseDTO(BaseModel):
+    """
+    DTO for the full localized details of a quiz.
+    Includes all questions and metadata.
+    """
     id: str
     title: str | None
     description: str | None
-    questions: list[QuestionOutDTO]
+    questions: list[QuestionDetailDTO]
 
 
 class CreateQuestionDTO(BaseModel):
+    """
+    DTO for creating a new question within a create-quiz request.
+    Includes type, localized text, and answer-key payload.
+    """
     type: str = Field(..., description="single_choice | fill_gap | multiple_choice | matching")
     text: dict[str, str] = Field(..., description='Localized text: {"en": "...", "de": "..."}')
     payload: dict[str, Any] = Field(
@@ -43,6 +63,9 @@ class CreateQuestionDTO(BaseModel):
 
 
 class CreateQuizDTO(BaseModel):
+    """
+    DTO for creating a new quiz and its associated questions.
+    """
     title: dict[str, str] = Field(..., description='Localized: {"en": "Title", "de": "Titel"}')
     description: dict[str, str] | None = None
     questions: list[CreateQuestionDTO] = Field(default_factory=list)

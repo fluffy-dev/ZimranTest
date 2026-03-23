@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     hooks_enabled: bool = Field(default=True, alias="APP_HOOKS_ENABLED")
     root_path: str = Field(default="", alias="APP_ROOT_PATH")
     timezone_shift: int = Field(default=3, alias="APP_TIMEZONE_SHIFT")
+    quiz_coins_per_correct_answer: int = Field(default=100, alias="QUIZ_COINS_PER_CORRECT_ANSWER")
+    quiz_reward_routing_key: str = Field(default="quiz.questions.rewarded", alias="QUIZ_REWARD_ROUTING_KEY")
 
 
 settings = Settings()

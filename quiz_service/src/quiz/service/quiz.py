@@ -12,19 +12,44 @@ logger = get_logger(__name__)
 
 
 class QuizService:
-    """Manages quiz CRUD and localized retrieval. Maps Entities to DTOs."""
+    """
+    Manages quiz creation, retrieval, and localization. 
+    Handles caching via Redis for optimized performance.
+    """
 
     def __init__(self, quiz_repo: IQuizRepository, redis: IRedis) -> None:
+        """
+        Initializes the QuizService.
+
+        Args:
+            quiz_repo: Repository for quiz data access.
+            redis: Redis client for caching.
+        """
         self._repo = quiz_repo
         self._redis = redis
 
     def _localize(self, jsonb_field: dict[str, Any] | None, locale: str) -> str | None:
+        """
+        Extracts the value for a specific locale from a JSONB field.
+        Falls back to 'en' or the first available value if the requested locale is missing.
+        """
         if jsonb_field is None:
             return None
         key = locale.lower().strip()
         return jsonb_field.get(key) or jsonb_field.get("en") or next(iter(jsonb_field.values()), None)
 
     async def list_quizzes(self, locale: str, page: int = 1, page_size: int = 20) -> QuizListResponseDTO:
+        """
+        Retrieves a paginated list of active quizzes, localized to the requested language.
+
+        Args:
+            locale: The ISO language code (e.g., 'en', 'es').
+            page: The page number to retrieve.
+            page_size: Number of items per page.
+
+        Returns:
+            QuizListResponseDTO: Localized list of quizzes and pagination metadata.
+        """
         cache_key = f"quizzes:list:{locale}:{page}:{page_size}"
         cached = await self._redis.get(cache_key)
         if cached:
@@ -34,20 +59,35 @@ class QuizService:
         quizzes = await self._repo.get_all_active(limit=page_size, offset=offset)
         total = await self._repo.count_active()
 
-        items = [
-            {
-                "id": str(q.id),
-                "title": self._localize(q.title, locale),
-                "description": self._localize(q.description, locale),
-                "question_count": len(q.questions),
-            }
-            for q in quizzes
-        ]
+        items = [self._map_to_list_item(q, locale) for q in quizzes]
+        
         response = QuizListResponseDTO(items=items, total=total, page=page, page_size=page_size)
         await self._redis.setex(cache_key, redis_settings.quiz_cache_ttl, response.model_dump_json())
         return response
 
+    def _map_to_list_item(self, quiz: QuizEntity, locale: str) -> dict[str, Any]:
+        """Maps a QuizEntity to a dictionary suitable for QuizListResponseDTO."""
+        return {
+            "id": str(quiz.id),
+            "title": self._localize(quiz.title, locale),
+            "description": self._localize(quiz.description, locale),
+            "question_count": len(quiz.questions),
+        }
+
     async def get_quiz(self, quiz_id: uuid.UUID, locale: str) -> QuizDetailResponseDTO:
+        """
+        Retrieves detailed information for a specific quiz, including localized questions.
+
+        Args:
+            quiz_id: The unique identifier of the quiz.
+            locale: The ISO language code for localization.
+
+        Returns:
+            QuizDetailResponseDTO: Full quiz details with localized content.
+
+        Raises:
+            NotFoundException: If the quiz is not found or is inactive.
+        """
         cache_key = f"quizzes:{quiz_id}:{locale}"
         cached = await self._redis.get(cache_key)
         if cached:
@@ -57,16 +97,10 @@ class QuizService:
         if quiz is None or not quiz.is_active:
             raise NotFoundException(f"Quiz {quiz_id} not found.")
 
-        questions_out = []
-        for q in sorted(quiz.questions, key=lambda x: x.order_index):
-            localized_payload = self._localize_question_payload(q.payload, q.type, locale)
-            questions_out.append({
-                "id": str(q.id),
-                "type": q.type,
-                "order_index": q.order_index,
-                "text": self._localize(q.text, locale),
-                "payload": localized_payload,
-            })
+        questions_out = [
+            self._map_to_question_detail(q, locale) 
+            for q in sorted(quiz.questions, key=lambda x: x.order_index)
+        ]
 
         response = QuizDetailResponseDTO(
             id=str(quiz.id),
@@ -77,9 +111,23 @@ class QuizService:
         await self._redis.setex(cache_key, redis_settings.quiz_cache_ttl, response.model_dump_json())
         return response
 
+    def _map_to_question_detail(self, question: QuestionEntity, locale: str) -> dict[str, Any]:
+        """Maps a QuestionEntity to a localized dictionary for QuizDetailResponseDTO."""
+        return {
+            "id": str(question.id),
+            "type": question.type,
+            "order_index": question.order_index,
+            "text": self._localize(question.text, locale),
+            "payload": self._localize_question_payload(question.payload, question.type, locale),
+        }
+
     def _localize_question_payload(self, payload: dict[str, Any], question_type: str, locale: str) -> dict[str, Any]:
+        """
+        Localizes the content of a question payload and strips sensitive correct-answer data.
+        """
         import copy
         p = copy.deepcopy(payload)
+        
         if question_type in ("single_choice", "multiple_choice"):
             p.pop("correct_id", None)
             p.pop("correct_ids", None)
@@ -94,15 +142,28 @@ class QuizService:
         return p
 
     async def create_quiz(self, request: CreateQuizDTO) -> QuizDetailResponseDTO:
+        """
+        Creates a new quiz along with its associated questions.
+
+        Args:
+            request: DTO containing the quiz and question details.
+
+        Returns:
+            QuizDetailResponseDTO: The newly created quiz details (localized to 'en').
+        """
         quiz = await self._repo.create(title=request.title, description=request.description)
         for i, q_req in enumerate(request.questions):
             await self._repo.add_question(
-                quiz_id=quiz.id, question_type=q_req.type,
-                text=q_req.text, payload=q_req.payload, order_index=i,
+                quiz_id=quiz.id, 
+                question_type=q_req.type,
+                text=q_req.text, 
+                payload=q_req.payload, 
+                order_index=i,
             )
         await self._invalidate_list_cache()
         return await self.get_quiz(quiz.id, locale="en")
 
     async def _invalidate_list_cache(self) -> None:
+        """Invalidates all cached quiz lists in Redis."""
         async for key in self._redis.scan_iter("quizzes:list:*"):
             await self._redis.delete(key)
