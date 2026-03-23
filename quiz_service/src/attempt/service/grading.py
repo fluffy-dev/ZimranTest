@@ -24,8 +24,20 @@ class GradingService:
 
     def check_answer(self, question: QuestionEntity, answer_payload: dict[str, Any]) -> bool:
         """
-        Returns True if the answer_payload is correct for the given question.
-        Raises ValidationException if the answer format is invalid.
+        Determines if the provided answer payload is correct for the given question.
+
+        Supports various question types including single choice, multiple choice, 
+        fill-in-the-gap (with normalization), and matching.
+
+        Args:
+            question: The domain entity of the question being answered.
+            answer_payload: The user's response data.
+
+        Returns:
+            bool: True if the answer is correct, False otherwise.
+
+        Raises:
+            ValidationException: If the answer payload format is invalid for the question type.
         """
         q_type = question.type
         try:

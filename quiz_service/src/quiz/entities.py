@@ -5,7 +5,10 @@ import uuid
 
 @dataclass
 class QuestionEntity:
-    """Domain entity representing a Quiz Question."""
+    """
+    Domain entity representing a single question.
+    Contains localized text and technical payload for the question type.
+    """
 
     id: uuid.UUID
     type: str
@@ -16,7 +19,10 @@ class QuestionEntity:
 
 @dataclass
 class QuizEntity:
-    """Domain entity representing a Quiz."""
+    """
+    Domain entity representing a Quiz.
+    Holds core quiz data and the list of associated questions.
+    """
 
     id: uuid.UUID
     title: dict[str, Any]
