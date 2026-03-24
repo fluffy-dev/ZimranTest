@@ -102,6 +102,10 @@ class BalanceTransaction(Base):
     )
 
     __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_txn_amount_positive"),
+        CheckConstraint(
+            "type IN ('credit', 'debit')", name="ck_txn_type_valid"
+        ),
         Index("idx_txn_user_id", "user_id"),
         Index("idx_txn_idempotency_key", "idempotency_key"),
     )

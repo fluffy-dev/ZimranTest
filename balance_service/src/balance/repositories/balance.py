@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from shared.exceptions import IdempotencyMismatchError
 from src.config.database.session import ISession
 from src.balance.models.balance import Balance, BalanceTransaction
 from src.balance.entities import BalanceEntity, BalanceTransactionEntity
@@ -14,13 +15,13 @@ logger = get_logger(__name__)
 
 
 def _map_balance_entity(db_obj: Balance) -> BalanceEntity:
-    """Convert a :class:`Balance` ORM instance to a :class:`BalanceEntity`.
+    """Convert a `Balance` ORM instance to a `BalanceEntity`.
 
     Args:
         db_obj: A hydrated SQLAlchemy ``Balance`` model retrieved from the DB.
 
     Returns:
-        A :class:`BalanceEntity` dataclass populated with the ORM object's data.
+        A `BalanceEntity` dataclass populated with the ORM object's data.
     """
     return BalanceEntity(
         id=db_obj.id,
@@ -31,14 +32,14 @@ def _map_balance_entity(db_obj: Balance) -> BalanceEntity:
 
 
 def _map_txn_entity(db_obj: BalanceTransaction) -> BalanceTransactionEntity:
-    """Convert a :class:`BalanceTransaction` ORM instance to a :class:`BalanceTransactionEntity`.
+    """Convert a `BalanceTransaction` ORM instance to a `BalanceTransactionEntity`.
 
     Args:
         db_obj: A hydrated SQLAlchemy ``BalanceTransaction`` model retrieved
             from the DB.
 
     Returns:
-        A :class:`BalanceTransactionEntity` dataclass populated with the ORM
+        A `BalanceTransactionEntity` dataclass populated with the ORM
         object's data.
     """
     return BalanceTransactionEntity(
@@ -82,10 +83,10 @@ class BalanceRepository:
         """Fetch the balance record for a given user.
 
         Args:
-            user_id: The UUID identifying the user whose balance to retrieve.
+            user_id: The UUID identifying the user whose balance is to retrieve.
 
         Returns:
-            A :class:`BalanceEntity` if a balance record exists, or ``None``
+            A `BalanceEntity` if a balance record exists, or ``None``
             if the user has never been credited.
         """
         result = await self._session.execute(
@@ -104,7 +105,7 @@ class BalanceRepository:
         """Atomically record a credit transaction and update the aggregate balance.
 
         Guarantees exactly-once semantics: if ``idempotency_key`` has already
-        been used the transaction insert is skipped and the current balance is
+        been used, the transaction insert is skipped, and the current balance is
         returned unchanged.
 
         Args:
@@ -116,7 +117,7 @@ class BalanceRepository:
                 transaction record.
 
         Returns:
-            The updated (or unchanged, for duplicates) :class:`BalanceEntity`.
+            The updated (or unchanged, for duplicates) `BalanceEntity`.
         """
         is_new = await self._try_insert_transaction(
             user_id=user_id,
@@ -126,12 +127,26 @@ class BalanceRepository:
         )
 
         if not is_new:
+            existing_txn = await self._get_transaction_by_idempotency_key(idempotency_key)
+
+            if existing_txn and existing_txn.amount != amount:
+                logger.warning(
+                    "Idempotency mismatch detected",
+                    idempotency_key=str(idempotency_key),
+                    old_amount=existing_txn.amount,
+                    new_amount=amount,
+                )
+                raise IdempotencyMismatchError(
+                    f"Idempotency key {idempotency_key} was already used "
+                    f"for {existing_txn.amount} coins. Cannot process for {amount}."
+                )
+
             logger.info(
-                "Duplicate idempotency key — skipping credit",
+                "Duplicate idempotency key — returning current balance safely",
                 idempotency_key=str(idempotency_key),
                 user_id=str(user_id),
             )
-            return await self._get_or_create_zero_balance(user_id)
+            return await self._get_current_balance_or_seed(user_id)
 
         balance = await self._apply_balance_credit(user_id=user_id, amount=amount)
 
@@ -144,6 +159,16 @@ class BalanceRepository:
         )
         return balance
 
+    async def _get_transaction_by_idempotency_key(
+            self, idempotency_key: uuid.UUID
+    ) -> BalanceTransactionEntity | None:
+        """Helper to fetch an existing transaction by its unique key."""
+        result = await self._session.execute(
+            select(BalanceTransaction).where(BalanceTransaction.idempotency_key == idempotency_key)
+        )
+        obj = result.scalar_one_or_none()
+        return _map_txn_entity(obj) if obj else None
+
     async def get_transactions(
         self, user_id: uuid.UUID, limit: int = 50, offset: int = 0
     ) -> list[BalanceTransactionEntity]:
@@ -155,7 +180,7 @@ class BalanceRepository:
             offset: Number of rows to skip (for pagination). Defaults to ``0``.
 
         Returns:
-            A list of :class:`BalanceTransactionEntity` objects ordered by
+            A list of `BalanceTransactionEntity` objects ordered by
             ``created_at DESC``. Returns an empty list if no transactions exist.
         """
         result = await self._session.execute(
@@ -218,7 +243,7 @@ class BalanceRepository:
             amount: Number of coins to add.
 
         Returns:
-            The updated :class:`BalanceEntity` reflecting the new total.
+            The updated `BalanceEntity` reflecting the new total.
         """
         stmt = (
             pg_insert(Balance)
@@ -231,28 +256,32 @@ class BalanceRepository:
         )
         result = await self._session.execute(stmt)
         balance = result.scalar_one()
-        await self._session.flush()
         return _map_balance_entity(balance)
 
-    async def _get_or_create_zero_balance(self, user_id: uuid.UUID) -> BalanceEntity:
-        """Return the existing balance or create a zero-value one if absent.
+    async def _get_current_balance_or_seed(self, user_id: uuid.UUID) -> BalanceEntity:
+        """Return the existing balance or safely create a zero-value one.
 
-        This handles a rare but theoretically possible race condition: a
-        duplicate transaction exists in the ledger but the aggregate balance
-        row has not been written yet (e.g. a previous write partially failed).
-
-        Args:
-            user_id: Owner of the balance to look up or create.
-
-        Returns:
-            The existing or newly-created zero :class:`BalanceEntity`.
+        Optimized to avoid PostgreSQL write-amplification (MVCC row duplication)
+        by attempting a fast, lock-free SELECT before falling back to an insert.
         """
-        balance = await self.get_by_user_id(user_id)
-        if balance is not None:
-            return balance
+        existing_balance = await self.get_by_user_id(user_id)
+        if existing_balance is not None:
+            return existing_balance
 
-        # Edge case: transaction exists but balance row is missing.
-        new_balance = Balance(user_id=user_id, amount=0)
-        self._session.add(new_balance)
-        await self._session.flush()
-        return _map_balance_entity(new_balance)
+        stmt = (
+            pg_insert(Balance)
+            .values(user_id=user_id, amount=0)
+            .on_conflict_do_nothing(index_elements=["user_id"])
+            .returning(Balance)
+        )
+        result = await self._session.execute(stmt)
+        new_balance = result.scalar_one_or_none()
+
+        if new_balance is not None:
+            return _map_balance_entity(new_balance)
+
+        concurrent_balance = await self.get_by_user_id(user_id)
+        if concurrent_balance is None:
+            raise RuntimeError(f"Failed to seed or retrieve balance for user {user_id}")
+
+        return concurrent_balance

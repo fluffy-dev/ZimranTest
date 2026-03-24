@@ -28,3 +28,7 @@ class AttemptAlreadyCompletedException(ConflictException):
 
 class InsufficientBalanceException(FineloBaseException):
     """Raised when a debit would exceed the current balance."""
+
+
+class IdempotencyMismatchError(FineloBaseException):
+    """Raised when an idempotency key is reused with a different payload."""
