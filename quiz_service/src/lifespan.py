@@ -8,8 +8,8 @@ import redis.asyncio as aioredis
 from src.config.redis import settings as redis_settings
 from src.config.rabbitmq import settings as rmq_settings
 from src.config.outbox import settings as outbox_settings
-from src.config.database.session import AsyncSessionFactory
-from src.attempt.repositories.outbox import OutboxRepository
+from src.uow import SqlAlchemyUnitOfWork
+from src.attempt.entities import OutboxEventEntity
 from shared.logging import get_logger
 from shared.messaging import MessagePublisher
 from shared.messaging.rabbitmq import RabbitMQPublisher
@@ -22,16 +22,55 @@ _publisher: MessagePublisher | None = None
 _outbox_task: asyncio.Task | None = None
 
 
+async def _publish_outbox_event(
+    uow: SqlAlchemyUnitOfWork,
+    event: OutboxEventEntity,
+    publisher: MessagePublisher,
+) -> None:
+    """
+    Serializes and publishes a single event to the message broker.
+    Marks the event as published on success, or increments attempts on failure.
+    """
+    try:
+        body = json.dumps(event.payload).encode()
+        await publisher.publish(
+            routing_key=event.routing_key,
+            body=body,
+            message_id=str(event.id),
+        )
+        await uow.outbox.mark_published(event.id)
+        logger.info(
+            "Outbox event published",
+            event_id=str(event.id),
+            event_type=event.event_type,
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to publish outbox event",
+            event_id=str(event.id),
+            error=str(exc),
+        )
+        await uow.outbox.increment_attempts(event.id)
+
+
+async def _process_pending_outbox_events(publisher: MessagePublisher) -> None:
+    """
+    Fetches a batch of pending outbox events and processes them one by one.
+    Each event is processed in its own transaction (UoW) to ensure reliability.
+    """
+    async with SqlAlchemyUnitOfWork() as uow:
+        events = await uow.outbox.get_pending_events(batch_size=outbox_settings.batch_size)
+
+    for event in events:
+        async with SqlAlchemyUnitOfWork() as uow:
+            await _publish_outbox_event(uow, event, publisher)
+            await uow.commit()
+
+
 async def _run_outbox_poller() -> None:
     """
-    Background task that reads pending outbox events and publishes them to RabbitMQ.
-    Runs every OUTBOX_POLL_INTERVAL seconds.
-
-    This implements the Polling Publisher variant of the Transactional Outbox pattern:
-    - Atomically written with DB writes
-    - Independently published by this background worker
-    - Guarantees at-least-once delivery
-    - Balance service is idempotent (handles duplicates via idempotency_key)
+    Main loop for the background outbox poller.
+    Orchestrates the periodic processing of pending events.
     """
     global _publisher
     assert _publisher is not None
@@ -40,32 +79,7 @@ async def _run_outbox_poller() -> None:
 
     while True:
         try:
-            async with AsyncSessionFactory() as session:
-                repo = OutboxRepository(session)
-                events = await repo.get_pending_events(batch_size=outbox_settings.batch_size)
-
-                for event in events:
-                    try:
-                        body = json.dumps(event.payload).encode()
-                        await _publisher.publish(
-                            routing_key=event.routing_key,
-                            body=body,
-                            message_id=str(event.id),
-                        )
-                        await repo.mark_published(event.id)
-                        logger.info(
-                            "Outbox event published",
-                            event_id=str(event.id),
-                            event_type=event.event_type,
-                        )
-                    except Exception as exc:
-                        logger.error(
-                            "Failed to publish outbox event",
-                            event_id=str(event.id),
-                            error=str(exc),
-                        )
-                        await repo.increment_attempts(event.id)
-
+            await _process_pending_outbox_events(_publisher)
         except asyncio.CancelledError:
             logger.info("Outbox poller shutting down")
             return

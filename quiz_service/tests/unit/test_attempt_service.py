@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -52,19 +52,32 @@ def mock_outbox_repo():
 
 
 @pytest.fixture
-def service(mock_quiz_repo, mock_attempt_repo, mock_outbox_repo):
+def mock_uow(mock_quiz_repo, mock_attempt_repo, mock_outbox_repo):
+    uow = AsyncMock()
+    uow.quizzes = mock_quiz_repo
+    uow.attempts = mock_attempt_repo
+    uow.outbox = mock_outbox_repo
+    uow.commit = AsyncMock()
+    uow.rollback = AsyncMock()
+    
+    # Mock async context manager
+    uow.__aenter__.return_value = uow
+    uow.__aexit__.return_value = None
+    return uow
+
+
+@pytest.fixture
+def service(mock_uow):
     grading = GradingService()
     return AttemptService(
-        quiz_repo=mock_quiz_repo,
-        attempt_repo=mock_attempt_repo,
-        outbox_repo=mock_outbox_repo,
+        uow=mock_uow,
         grading_service=grading,
     )
 
 
 class TestSubmitAttempt:
     async def test_correct_score_calculated(
-        self, service, mock_quiz_repo, mock_attempt_repo, mock_outbox_repo
+        self, service, mock_quiz_repo, mock_attempt_repo, mock_outbox_repo, mock_uow
     ):
         user_id = uuid.uuid4()
         q1_id = uuid.uuid4()
@@ -100,9 +113,10 @@ class TestSubmitAttempt:
         assert result.score == 2
         assert result.total_questions == 2
         assert result.coins_awarded == 2 * settings.quiz_coins_per_correct_answer
+        mock_uow.commit.assert_awaited_once()
 
     async def test_no_reward_for_already_rewarded_question(
-        self, service, mock_quiz_repo, mock_attempt_repo, mock_outbox_repo
+        self, service, mock_quiz_repo, mock_attempt_repo, mock_outbox_repo, mock_uow
     ):
         user_id = uuid.uuid4()
         q1_id = uuid.uuid4()
@@ -131,6 +145,7 @@ class TestSubmitAttempt:
         assert result.coins_awarded == 0
         assert result.question_results[0].was_already_rewarded is True
         mock_outbox_repo.insert_event.assert_not_awaited()
+        mock_uow.commit.assert_awaited_once()
 
     async def test_raises_on_completed_attempt(
         self, service, mock_attempt_repo

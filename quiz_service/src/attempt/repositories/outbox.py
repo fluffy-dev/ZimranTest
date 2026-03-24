@@ -93,7 +93,6 @@ class OutboxRepository:
             .where(OutboxEvent.id == event_id)
             .values(published_at=datetime.now(tz=timezone.utc))
         )
-        await self._session.commit()
 
     async def increment_attempts(self, event_id: uuid.UUID) -> None:
         """
@@ -107,4 +106,3 @@ class OutboxRepository:
             .where(OutboxEvent.id == event_id)
             .values(attempts=OutboxEvent.attempts + 1)
         )
-        await self._session.commit()

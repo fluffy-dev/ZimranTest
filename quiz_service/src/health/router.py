@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Any, Coroutine
+
 from fastapi import APIRouter
 from sqlalchemy import text
+from starlette.responses import JSONResponse
 
 from src.config.database.engine import db_helper
 
@@ -14,7 +17,7 @@ async def liveness() -> dict:
 
 
 @router.get("/ready", summary="Readiness probe (checks DB + Redis)")
-async def readiness() -> dict:
+async def readiness() -> JSONResponse:
     from src.lifespan import redis_client
 
     results: dict[str, str] = {}

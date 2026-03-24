@@ -24,22 +24,18 @@ def make_event(coins: int = 200) -> QuizRewardEvent:
 
 class TestHandleQuizRewardMessage:
     async def test_valid_message_credits_balance(self):
-        """A valid message deserializes and calls credit_from_quiz_event."""
+        """A valid message deserializes and calls credit_from_quiz_event via UoW."""
         event = make_event(coins=100)
         body = json.dumps(event.model_dump(mode="json")).encode()
 
-        mock_session = AsyncMock()
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
-        mock_session.begin = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(), __aexit__=AsyncMock(return_value=False)))
-
         mock_balance = MagicMock(amount=100)
 
-        with patch("src.balance.consumer.db_helper") as mock_db_helper, \
-             patch("src.balance.consumer.BalanceService") as MockService, \
-             patch("src.balance.consumer.BalanceRepository"):
+        with patch("src.balance.consumer.SqlAlchemyUnitOfWork") as MockUOW, \
+             patch("src.balance.consumer.BalanceService") as MockService:
 
-            mock_db_helper.get_db_session.return_value = mock_session
+            mock_uow_instance = MagicMock()
+            MockUOW.return_value = mock_uow_instance
+            
             mock_service_instance = AsyncMock()
             mock_service_instance.credit_from_quiz_event.return_value = mock_balance
             MockService.return_value = mock_service_instance
@@ -52,6 +48,8 @@ class TestHandleQuizRewardMessage:
                 message_id=str(uuid.uuid4()),
             )
 
+            MockUOW.assert_called_once()
+            MockService.assert_called_once_with(mock_uow_instance)
             mock_service_instance.credit_from_quiz_event.assert_awaited_once()
 
     async def test_invalid_json_raises(self):

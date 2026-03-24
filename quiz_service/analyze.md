@@ -40,3 +40,43 @@ To handle dynamic rewards (different coins per user, per quiz, or per level):
 - **Option C (Database Config)**: Store these in a `GlobalSettings` or `RewardPolicy` table in the database, which can be modified via an admin API.
 
 **Recommendation**: For now, move to `.env` for basic flexibility. If the requirement for per-quiz rewards arises, Option A is the most straightforward architectural path.
+
+
+EXAMPLE:
+{
+  "answers": [
+    {
+      "question_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "answer_payload": {
+        "selected_id": "a"
+      }
+    },
+    {
+      "question_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "answer_payload": {
+        "answer": "Satoshi Nakamoto"
+      }
+    },
+    {
+      "question_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "answer_payload": {
+        "selected_ids": ["a", "b", "d"]
+      }
+    },
+    {
+      "question_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "answer_payload": {
+        "pairs": [
+          {
+            "pair_id": "p1",
+            "matched_pair_id": "p1"
+          },
+          {
+            "pair_id": "p2",
+            "matched_pair_id": "p2"
+          }
+        ]
+      }
+    }
+  ]
+}
