@@ -45,4 +45,4 @@ def _get_locale(accept_language: str = Header(default="en")) -> str:
     )
 
 
-ILocale = Annotated[str, Depends(_get_locale)]
+ILocale: type[str] = Annotated[str, Depends(_get_locale)]
