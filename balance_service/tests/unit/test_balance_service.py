@@ -34,27 +34,17 @@ def make_balance(user_id: uuid.UUID, amount: int = 0) -> SimpleNamespace:
 
 @pytest.fixture
 def mock_repo():
-    return AsyncMock()
+    repo = AsyncMock()
+    return repo
 
 
 @pytest.fixture
-def mock_uow(mock_repo):
-    uow = AsyncMock()
-    uow.balances = mock_repo
-    uow.commit = AsyncMock()
-    uow.rollback = AsyncMock()
-    uow.__aenter__.return_value = uow
-    uow.__aexit__.return_value = None
-    return uow
-
-
-@pytest.fixture
-def service(mock_uow):
-    return BalanceService(uow=mock_uow)
+def service(mock_repo):
+    return BalanceService(repo=mock_repo)
 
 
 class TestCreditFromQuizEvent:
-    async def test_credits_correct_amount(self, service, mock_repo, mock_uow):
+    async def test_credits_correct_amount(self, service, mock_repo):
         event = make_event(coins=200)
         expected_balance = make_balance(event.payload.user_id, amount=200)
         mock_repo.upsert_credit.return_value = expected_balance
@@ -68,7 +58,6 @@ class TestCreditFromQuizEvent:
             description=f"Quiz reward: attempt {event.payload.attempt_id}",
         )
         assert result.amount == 200
-        mock_uow.commit.assert_awaited_once()
 
     async def test_zero_coins_skips_credit(self, service, mock_repo):
         event = make_event(coins=0)

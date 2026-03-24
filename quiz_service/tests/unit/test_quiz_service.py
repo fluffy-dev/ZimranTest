@@ -59,17 +59,6 @@ def mock_redis():
     return r
 
 
-@pytest.fixture
-def mock_uow(mock_repo):
-    uow = AsyncMock()
-    uow.quizzes = mock_repo
-    uow.commit = AsyncMock()
-    uow.rollback = AsyncMock()
-    uow.__aenter__.return_value = uow
-    uow.__aexit__.return_value = None
-    return uow
-
-
 class AsyncIterHelper:
     """Converts a list into an async iterator for mocking redis.scan_iter."""
 
@@ -86,8 +75,8 @@ class AsyncIterHelper:
 
 
 @pytest.fixture
-def service(mock_repo, mock_redis, mock_uow):
-    return QuizService(quiz_repo=mock_repo, redis=mock_redis, uow=mock_uow)
+def service(mock_repo, mock_redis):
+    return QuizService(quiz_repo=mock_repo, redis=mock_redis)
 
 
 class TestListQuizzes:
@@ -216,7 +205,7 @@ class TestGetQuiz:
 
 
 class TestCreateQuiz:
-    async def test_creates_quiz_with_questions(self, service, mock_repo, mock_redis, mock_uow):
+    async def test_creates_quiz_with_questions(self, service, mock_repo, mock_redis):
         """Creates a quiz and returns the detail response."""
         from src.quiz.dto import CreateQuizDTO, CreateQuestionDTO
 
@@ -237,7 +226,6 @@ class TestCreateQuiz:
 
         mock_repo.create.assert_awaited_once()
         mock_repo.add_question.assert_awaited_once()
-        mock_uow.commit.assert_awaited_once()
 
     async def test_invalidates_list_cache(self, service, mock_repo, mock_redis):
         """Creating a quiz invalidates the list cache keys."""

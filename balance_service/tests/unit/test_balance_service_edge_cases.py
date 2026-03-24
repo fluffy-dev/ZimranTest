@@ -40,19 +40,8 @@ def mock_repo():
 
 
 @pytest.fixture
-def mock_uow(mock_repo):
-    uow = AsyncMock()
-    uow.balances = mock_repo
-    uow.commit = AsyncMock()
-    uow.rollback = AsyncMock()
-    uow.__aenter__.return_value = uow
-    uow.__aexit__.return_value = None
-    return uow
-
-
-@pytest.fixture
-def service(mock_uow):
-    return BalanceService(uow=mock_uow)
+def service(mock_repo):
+    return BalanceService(repo=mock_repo)
 
 
 class TestGetBalance:
@@ -66,7 +55,7 @@ class TestGetBalance:
         assert result.amount == 500
         mock_repo.upsert_credit.assert_not_awaited()
 
-    async def test_creates_initial_balance_when_none(self, service, mock_repo, mock_uow):
+    async def test_creates_initial_balance_when_none(self, service, mock_repo):
         """Creates a zero balance when user has no existing record."""
         user_id = uuid.uuid4()
         mock_repo.get_by_user_id.return_value = None
@@ -79,7 +68,6 @@ class TestGetBalance:
         call_kwargs = mock_repo.upsert_credit.call_args.kwargs
         assert call_kwargs["amount"] == 0
         assert call_kwargs["description"] == "Initial balance setup"
-        mock_uow.commit.assert_awaited_once()
 
 
 class TestCreditFromQuizEvent:
@@ -102,7 +90,7 @@ class TestCreditFromQuizEvent:
         assert result.amount == 100
         mock_repo.upsert_credit.assert_not_awaited()
 
-    async def test_zero_coins_creates_balance_if_none(self, service, mock_repo, mock_uow):
+    async def test_zero_coins_creates_balance_if_none(self, service, mock_repo):
         """Zero coins event creates initial balance if user has none."""
         user_id = uuid.uuid4()
         event = QuizRewardEvent(
@@ -120,7 +108,6 @@ class TestCreditFromQuizEvent:
         result = await service.credit_from_quiz_event(event)
 
         assert result.amount == 0
-        mock_uow.commit.assert_awaited_once()
 
 
 class TestGetTransactions:

@@ -1,9 +1,6 @@
 from __future__ import annotations
-
 import uuid
 from typing import Any
-
-from src.uow import IUnitOfWork
 from src.quiz.dependencies.repository import IQuizRepository
 from src.quiz.dto import QuizDetailResponseDTO, QuizListResponseDTO, CreateQuizDTO
 from src.dependencies.common import IRedis
@@ -15,36 +12,35 @@ logger = get_logger(__name__)
 
 
 class QuizService:
-    """Manages quiz creation, retrieval, and localization.
-    Handles caching via Redis for optimized performance."""
+    """
+    Manages quiz creation, retrieval, and localization. 
+    Handles caching via Redis for optimized performance.
+    """
 
-    def __init__(
-        self,
-        quiz_repo: IQuizRepository,
-        redis: IRedis,
-        uow: IUnitOfWork,
-    ) -> None:
-        """Initializes the QuizService.
+    def __init__(self, quiz_repo: IQuizRepository, redis: IRedis) -> None:
+        """
+        Initializes the QuizService.
 
         Args:
-            quiz_repo: Repository for read-only quiz data access.
+            quiz_repo: Repository for quiz data access.
             redis: Redis client for caching.
-            uow: Unit of Work for write operations.
         """
         self._repo = quiz_repo
         self._redis = redis
-        self._uow = uow
 
     def _localize(self, jsonb_field: dict[str, Any] | None, locale: str) -> str | None:
-        """Extracts the value for a specific locale from a JSONB field.
-        Falls back to 'en' or the first available value if the requested locale is missing."""
+        """
+        Extracts the value for a specific locale from a JSONB field.
+        Falls back to 'en' or the first available value if the requested locale is missing.
+        """
         if jsonb_field is None:
             return None
         key = locale.lower().strip()
         return jsonb_field.get(key) or jsonb_field.get("en") or next(iter(jsonb_field.values()), None)
 
     async def list_quizzes(self, locale: str, page: int = 1, page_size: int = 20) -> QuizListResponseDTO:
-        """Retrieves a paginated list of active quizzes, localized to the requested language.
+        """
+        Retrieves a paginated list of active quizzes, localized to the requested language.
 
         Args:
             locale: The ISO language code (e.g., 'en', 'es').
@@ -64,12 +60,12 @@ class QuizService:
         total = await self._repo.count_active()
 
         items = [self._map_to_list_item(q, locale) for q in quizzes]
-
+        
         response = QuizListResponseDTO(items=items, total=total, page=page, page_size=page_size)
         await self._redis.setex(cache_key, redis_settings.quiz_cache_ttl, response.model_dump_json())
         return response
 
-    def _map_to_list_item(self, quiz, locale: str) -> dict[str, Any]:
+    def _map_to_list_item(self, quiz: QuizEntity, locale: str) -> dict[str, Any]:
         """Maps a QuizEntity to a dictionary suitable for QuizListResponseDTO."""
         return {
             "id": str(quiz.id),
@@ -79,7 +75,8 @@ class QuizService:
         }
 
     async def get_quiz(self, quiz_id: uuid.UUID, locale: str) -> QuizDetailResponseDTO:
-        """Retrieves detailed information for a specific quiz, including localized questions.
+        """
+        Retrieves detailed information for a specific quiz, including localized questions.
 
         Args:
             quiz_id: The unique identifier of the quiz.
@@ -101,7 +98,7 @@ class QuizService:
             raise NotFoundException(f"Quiz {quiz_id} not found.")
 
         questions_out = [
-            self._map_to_question_detail(q, locale)
+            self._map_to_question_detail(q, locale) 
             for q in sorted(quiz.questions, key=lambda x: x.order_index)
         ]
 
@@ -114,7 +111,7 @@ class QuizService:
         await self._redis.setex(cache_key, redis_settings.quiz_cache_ttl, response.model_dump_json())
         return response
 
-    def _map_to_question_detail(self, question, locale: str) -> dict[str, Any]:
+    def _map_to_question_detail(self, question: QuestionEntity, locale: str) -> dict[str, Any]:
         """Maps a QuestionEntity to a localized dictionary for QuizDetailResponseDTO."""
         return {
             "id": str(question.id),
@@ -125,10 +122,12 @@ class QuizService:
         }
 
     def _localize_question_payload(self, payload: dict[str, Any], question_type: str, locale: str) -> dict[str, Any]:
-        """Localizes the content of a question payload and strips sensitive correct-answer data."""
+        """
+        Localizes the content of a question payload and strips sensitive correct-answer data.
+        """
         import copy
         p = copy.deepcopy(payload)
-
+        
         if question_type in ("single_choice", "multiple_choice"):
             p.pop("correct_id", None)
             p.pop("correct_ids", None)
@@ -143,10 +142,8 @@ class QuizService:
         return p
 
     async def create_quiz(self, request: CreateQuizDTO) -> QuizDetailResponseDTO:
-        """Creates a new quiz along with its associated questions atomically.
-
-        Uses the Unit of Work to ensure the quiz and all questions are
-        persisted in a single transaction.
+        """
+        Creates a new quiz along with its associated questions.
 
         Args:
             request: DTO containing the quiz and question details.
@@ -154,20 +151,15 @@ class QuizService:
         Returns:
             QuizDetailResponseDTO: The newly created quiz details (localized to 'en').
         """
-        async with self._uow:
-            quiz = await self._uow.quizzes.create(
-                title=request.title, description=request.description
+        quiz = await self._repo.create(title=request.title, description=request.description)
+        for i, q_req in enumerate(request.questions):
+            await self._repo.add_question(
+                quiz_id=quiz.id, 
+                question_type=q_req.type,
+                text=q_req.text, 
+                payload=q_req.payload, 
+                order_index=i,
             )
-            for i, q_req in enumerate(request.questions):
-                await self._uow.quizzes.add_question(
-                    quiz_id=quiz.id,
-                    question_type=q_req.type,
-                    text=q_req.text,
-                    payload=q_req.payload,
-                    order_index=i,
-                )
-            await self._uow.commit()
-
         await self._invalidate_list_cache()
         return await self.get_quiz(quiz.id, locale="en")
 
