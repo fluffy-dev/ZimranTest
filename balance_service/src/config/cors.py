@@ -49,7 +49,7 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return (MyCustomSource(settings_cls),)
+        return (MyCustomSource(settings_cls), env_settings, dotenv_settings)
 
 
 settings = Settings()

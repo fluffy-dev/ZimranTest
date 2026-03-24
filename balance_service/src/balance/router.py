@@ -31,12 +31,7 @@ async def get_balance(
         A :class:`~src.balance.dto.BalanceResponseDTO` containing ``user_id``,
         current ``amount``, and ``updated_at`` timestamp.
     """
-    balance = await service.get_balance(user_id=user_id)
-    return BalanceResponseDTO(
-        user_id=balance.user_id,
-        amount=balance.amount,
-        updated_at=balance.updated_at,
-    )
+    return await service.get_balance(user_id=user_id)
 
 
 @router.get("/transactions", response_model=TransactionListResponseDTO, summary="Transaction history")
@@ -67,19 +62,5 @@ async def get_transactions(
         paginated ``items`` list along with echoed ``page`` and ``page_size``
         metadata.
     """
-    txns = await service.get_transactions(user_id=user_id, page=page, page_size=page_size)
-    return TransactionListResponseDTO(
-        items=[
-            TransactionResponseDTO(
-                id=t.id,
-                user_id=t.user_id,
-                type=t.type,
-                amount=t.amount,
-                description=t.description,
-                created_at=t.created_at,
-            )
-            for t in txns
-        ],
-        page=page,
-        page_size=page_size,
-    )
+    return await service.get_transactions(user_id=user_id, page=page, page_size=page_size)
+

@@ -3,8 +3,7 @@ from __future__ import annotations
 import json
 
 from src.config.rabbitmq import settings as rmq_settings
-from src.config.database.engine import db_helper
-from src.balance.repositories.balance import BalanceRepository
+from src.uow import SqlAlchemyUnitOfWork
 from src.balance.service.balance import BalanceService
 from shared.logging import get_logger
 from shared.messaging import MessageConsumer
@@ -58,18 +57,16 @@ async def handle_quiz_reward_message(
         logger.error("Failed to deserialize quiz reward event", error=str(exc), raw=raw[:300])
         raise  # nack to DLQ
 
-    async with db_helper.get_db_session() as session:
-        async with session.begin():
-            repo = BalanceRepository(session)
-            service = BalanceService(repo)
-            balance = await service.credit_from_quiz_event(event)
-            logger.info(
-                "Balance credited from quiz event",
-                user_id=str(event.payload.user_id),
-                coins=event.payload.coins_to_award,
-                new_balance=balance.amount,
-                event_id=str(event.event_id),
-            )
+    async with SqlAlchemyUnitOfWork() as uow:
+        service = BalanceService(uow)
+        balance = await service.credit_from_quiz_event(event)
+        logger.info(
+            "Balance credited from quiz event",
+            user_id=str(event.payload.user_id),
+            coins=event.payload.coins_to_award,
+            new_balance=balance.amount,
+            event_id=str(event.event_id),
+        )
 
 
 async def start_consumer() -> MessageConsumer:

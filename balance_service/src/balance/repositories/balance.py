@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from shared.exceptions import IdempotencyMismatchError
 from src.config.database.session import ISession
 from src.balance.models.balance import Balance, BalanceTransaction
 from src.balance.entities import BalanceEntity, BalanceTransactionEntity
+from src.balance.enum import TransactionType
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
@@ -218,7 +219,7 @@ class BalanceRepository:
             pg_insert(BalanceTransaction)
             .values(
                 user_id=user_id,
-                type="credit",
+                type=TransactionType.CREDIT,
                 amount=amount,
                 description=description,
                 idempotency_key=idempotency_key,
@@ -250,7 +251,10 @@ class BalanceRepository:
             .values(user_id=user_id, amount=amount)
             .on_conflict_do_update(
                 index_elements=["user_id"],
-                set_={"amount": Balance.amount + amount},
+                set_={
+                    "amount": Balance.amount + amount,
+                    "updated_at": func.now(),
+                },
             )
             .returning(Balance)
         )
@@ -285,3 +289,50 @@ class BalanceRepository:
             raise RuntimeError(f"Failed to seed or retrieve balance for user {user_id}")
 
         return concurrent_balance
+    async def _ensure_balance_row(self, user_id: uuid.UUID) -> None:
+        """Safely ensure a balance row exists for the user without updating it.
+
+        Uses ``INSERT … ON CONFLICT DO NOTHING`` to guarantee a record exists
+        without creating a transaction ledger entry or modifying an existing
+        balance.
+        """
+        stmt = (
+            pg_insert(Balance)
+            .values(user_id=user_id, amount=0)
+            .on_conflict_do_nothing(index_elements=["user_id"])
+        )
+        await self._session.execute(stmt)
+
+    async def get_transaction_count(self, user_id: uuid.UUID) -> int:
+        """Return the total number of transactions recorded for a user.
+
+        Used for calculating total pages in paginated API responses.
+        """
+        result = await self._session.execute(
+            select(func.count()).select_from(BalanceTransaction).where(BalanceTransaction.user_id == user_id)
+        )
+        return result.scalar_one()
+
+    async def _ensure_balance_row(self, user_id: uuid.UUID) -> None:
+        """Safely ensure a balance row exists for the user without updating it.
+
+        Uses ``INSERT … ON CONFLICT DO NOTHING`` to guarantee a record exists
+        without creating a transaction ledger entry or modifying an existing
+        balance.
+        """
+        stmt = (
+            pg_insert(Balance)
+            .values(user_id=user_id, amount=0)
+            .on_conflict_do_nothing(index_elements=["user_id"])
+        )
+        await self._session.execute(stmt)
+
+    async def get_transaction_count(self, user_id: uuid.UUID) -> int:
+        """Return the total number of transactions recorded for a user.
+
+        Used for calculating total pages in paginated API responses.
+        """
+        result = await self._session.execute(
+            select(func.count()).select_from(BalanceTransaction).where(BalanceTransaction.user_id == user_id)
+        )
+        return result.scalar_one()

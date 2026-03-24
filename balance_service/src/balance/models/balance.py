@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.libs.base_model import Base
+from src.balance.enum import TransactionType
 
 
 class Balance(Base):
@@ -48,7 +49,6 @@ class Balance(Base):
 
     __table_args__ = (
         CheckConstraint("amount >= 0", name="ck_balance_non_negative"),
-        Index("idx_balances_user_id", "user_id"),
     )
 
 
@@ -93,7 +93,7 @@ class BalanceTransaction(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    type: Mapped[str] = mapped_column(String(10), nullable=False)
+    type: Mapped[TransactionType] = mapped_column(String(10), nullable=False)
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     idempotency_key: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
@@ -107,5 +107,4 @@ class BalanceTransaction(Base):
             "type IN ('credit', 'debit')", name="ck_txn_type_valid"
         ),
         Index("idx_txn_user_id", "user_id"),
-        Index("idx_txn_idempotency_key", "idempotency_key"),
     )

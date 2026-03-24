@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from src.config.database.engine import db_helper
+from src.lifespan import is_consumer_connected
 
 router = APIRouter(prefix="/health", tags=["Health"])
 
@@ -26,6 +27,8 @@ async def readiness() -> JSONResponse:
         results["database"] = "ok"
     except Exception as exc:
         results["database"] = f"error: {exc}"
+
+    results["messaging"] = "ok" if is_consumer_connected() else "disconnected"
 
     all_ok = all(v == "ok" for v in results.values())
 

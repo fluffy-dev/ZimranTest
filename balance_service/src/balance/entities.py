@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from src.balance.enum import TransactionType
 
 
 @dataclass(slots=True)
@@ -56,7 +57,7 @@ class BalanceTransactionEntity:
 
     id: uuid.UUID
     user_id: uuid.UUID
-    type: str
+    type: TransactionType
     amount: int
     description: str | None
     idempotency_key: uuid.UUID

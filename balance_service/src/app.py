@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+import uuid
 
 import structlog
 from fastapi import FastAPI, Request, status
@@ -17,8 +18,9 @@ from src.config.cors import settings as cors_settings
 from src.dependencies.common import HEADERS
 from shared.exceptions import FineloBaseException, NotFoundException
 from shared.logging import configure_logging
+from src.config.logging import settings as log_settings
 
-configure_logging(service_name="balance-service", log_level="INFO")
+configure_logging(service_name="balance-service", log_level=log_settings.logging_level)
 logger = structlog.get_logger(__name__)
 
 
@@ -59,7 +61,6 @@ app.add_middleware(
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
     """Injects a correlation ID into every request for distributed tracing."""
-    import uuid
 
     h_name = HEADERS.CORRELATION_ID
     correlation_id = request.headers.get(h_name, str(uuid.uuid4()))

@@ -24,10 +24,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from src.libs.base_model import Base
 import migrations.models  # Import all models to register with Base
+from src.config.database.settings import settings as db_settings
 
-url = os.environ.get("DATABASE_URL")
-if url:
-    config.set_main_option("sqlalchemy.url", url)
+
+config.set_main_option("sqlalchemy.url", str(db_settings.database_url))
 
 target_metadata = Base.metadata
 

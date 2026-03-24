@@ -65,3 +65,4 @@ class TransactionListResponseDTO(BaseModel):
     items: list[TransactionResponseDTO]
     page: int
     page_size: int
+    total: int
