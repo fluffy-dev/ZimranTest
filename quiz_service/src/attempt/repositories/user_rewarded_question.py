@@ -7,10 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.attempt.models.user_rewarded_question import UserRewardedQuestion
+from src.attempt.entities import UserRewardedQuestionEntity
 
 
 class UserRewardedQuestionRepository:
-    """Repository for managing UserRewardedQuestion entities."""
+    """Repository for managing UserRewardedQuestion domain entities."""
 
     def __init__(self, session: AsyncSession) -> None:
         """
@@ -46,11 +47,20 @@ class UserRewardedQuestionRepository:
         )
         return {row[0] for row in result.all()}
 
-    async def bulk_create(self, rewards: Sequence[UserRewardedQuestion]) -> None:
+    async def bulk_add(self, entities: Sequence[UserRewardedQuestionEntity]) -> None:
         """
-        Persists multiple user rewarded question records to the database.
+        Translates a sequence of domain entities into ORM models and stages them for insertion.
 
         Args:
-            rewards: A sequence of UserRewardedQuestion model instances.
+            entities: A sequence of UserRewardedQuestionEntity objects.
         """
-        self._session.add_all(rewards)
+        models = [
+            UserRewardedQuestion(
+                user_id=entity.user_id,
+                question_id=entity.question_id,
+                quiz_id=entity.quiz_id,
+                rewarded_at=entity.rewarded_at,
+            )
+            for entity in entities
+        ]
+        self._session.add_all(models)

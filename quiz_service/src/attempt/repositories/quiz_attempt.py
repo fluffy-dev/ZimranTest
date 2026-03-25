@@ -7,11 +7,12 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.attempt.models.quiz_attempt import QuizAttempt
+from src.attempt.entities import QuizAttemptEntity
 from src.attempt.enum import AttemptStatusEnum
 
 
 class QuizAttemptRepository:
-    """Repository for managing QuizAttempt entities."""
+    """Repository for managing QuizAttempt domain entities."""
 
     def __init__(self, session: AsyncSession) -> None:
         """
@@ -22,86 +23,97 @@ class QuizAttemptRepository:
         """
         self._session = session
 
-    async def create(self, attempt: QuizAttempt) -> QuizAttempt:
+    def _map_to_entity(self, model: QuizAttempt) -> QuizAttemptEntity:
+        return QuizAttemptEntity(
+            id=model.id,
+            quiz_id=model.quiz_id,
+            user_id=model.user_id,
+            status=model.status,
+            score=model.score,
+            total_questions=model.total_questions,
+            started_at=model.started_at,
+            updated_at=model.updated_at,
+            completed_at=model.completed_at,
+        )
+
+    async def add(self, entity: QuizAttemptEntity) -> None:
         """
-        Persists a new quiz attempt to the database.
+        Translates a domain entity into an ORM model and stages it for insertion.
 
         Args:
-            attempt: The QuizAttempt model instance to save.
-
-        Returns:
-            The persisted QuizAttempt instance.
+            entity: The QuizAttemptEntity to persist.
         """
-        self._session.add(attempt)
-        await self._session.flush()
-        return attempt
+        model = QuizAttempt(
+            id=entity.id,
+            quiz_id=entity.quiz_id,
+            user_id=entity.user_id,
+            status=entity.status,
+            score=entity.score,
+            total_questions=entity.total_questions,
+            started_at=entity.started_at,
+            updated_at=entity.updated_at,
+            completed_at=entity.completed_at,
+        )
+        self._session.add(model)
 
-    async def get_by_id(self, attempt_id: uuid.UUID) -> QuizAttempt | None:
+    async def get_by_id(self, attempt_id: uuid.UUID) -> QuizAttemptEntity | None:
         """
-        Retrieves a quiz attempt by its unique identifier.
+        Retrieves an attempt by its ID and maps it to a domain entity.
 
         Args:
             attempt_id: The UUID of the attempt.
 
         Returns:
-            The QuizAttempt instance if found, otherwise None.
+            The mapped QuizAttemptEntity if found, otherwise None.
         """
         result = await self._session.execute(
             select(QuizAttempt).where(QuizAttempt.id == attempt_id)
         )
-        return result.scalar_one_or_none()
+        model = result.scalar_one_or_none()
+        return self._map_to_entity(model) if model else None
 
-    async def get_by_id_for_update(self, attempt_id: uuid.UUID) -> QuizAttempt | None:
+    async def get_by_id_for_update(self, attempt_id: uuid.UUID) -> QuizAttemptEntity | None:
         """
-        Retrieves a quiz attempt with a pessimistic lock for updates.
+        Retrieves a locked attempt by its ID and maps it to a domain entity.
 
         Args:
             attempt_id: The UUID of the attempt.
 
         Returns:
-            The locked QuizAttempt instance if found, otherwise None.
+            The locked and mapped QuizAttemptEntity if found, otherwise None.
         """
         result = await self._session.execute(
-            select(QuizAttempt)
-            .where(QuizAttempt.id == attempt_id)
-            .with_for_update()
+            select(QuizAttempt).where(QuizAttempt.id == attempt_id).with_for_update()
         )
-        return result.scalar_one_or_none()
+        model = result.scalar_one_or_none()
+        return self._map_to_entity(model) if model else None
 
-    async def update_status_and_score(
-        self,
-        attempt_id: uuid.UUID,
-        status: AttemptStatusEnum,
-        score: int,
-        total_questions: int,
-        completed_at: datetime,
-    ) -> None:
+    async def update(self, entity: QuizAttemptEntity) -> None:
         """
-        Updates the completion details of a quiz attempt.
+        Updates an existing attempt record based on the provided entity state.
 
         Args:
-            attempt_id: The UUID of the attempt.
-            status: The new status of the attempt.
-            score: The calculated score.
-            total_questions: The total number of questions.
-            completed_at: The timestamp of completion.
+            entity: The updated QuizAttemptEntity.
         """
         await self._session.execute(
             update(QuizAttempt)
-            .where(QuizAttempt.id == attempt_id)
+            .where(QuizAttempt.id == entity.id)
             .values(
-                status=status,
-                score=score,
-                total_questions=total_questions,
-                completed_at=completed_at,
+                status=entity.status,
+                score=entity.score,
+                total_questions=entity.total_questions,
+                updated_at=entity.updated_at,
+                completed_at=entity.completed_at,
             )
         )
 
     async def mark_abandoned(self, attempt_id: uuid.UUID) -> None:
         """
-        Updates a specific attempt's status to abandoned (e.g., user clicked 'Quit').
+        Directly updates a specific attempt's status to abandoned.
+
+        Args:
+            attempt_id: The UUID of the attempt.
         """
-        from sqlalchemy import update
         await self._session.execute(
             update(QuizAttempt)
             .where(QuizAttempt.id == attempt_id)
@@ -110,10 +122,14 @@ class QuizAttemptRepository:
 
     async def bulk_mark_abandoned(self, expiration_threshold: datetime) -> int:
         """
-        Marks stalled 'in_progress' attempts as 'abandoned' based on updated_at.
-        Designed for the background Reaper worker.
+        Bulk updates stalled 'in_progress' attempts to 'abandoned' based on inactivity.
+
+        Args:
+            expiration_threshold: The timestamp threshold for inactivity.
+
+        Returns:
+            The number of records updated.
         """
-        from sqlalchemy import update
         result = await self._session.execute(
             update(QuizAttempt)
             .where(
