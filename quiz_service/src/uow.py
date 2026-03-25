@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Annotated
+from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -48,8 +48,8 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
     Creates a fresh session on entry and safely closes it on exit.
     """
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession] | None = None) -> None:
-        self._session_factory = session_factory or db_helper.session_factory
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        self._session_factory = session_factory
 
     async def __aenter__(self) -> SqlAlchemyUnitOfWork:
         self._session: AsyncSession = self._session_factory()
@@ -63,7 +63,8 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        await super().__aexit__(exc_type, exc_val, exc_tb)
+        if exc_type is not None:
+            await self.rollback()
         await self._session.close()
 
     async def commit(self) -> None:
@@ -73,4 +74,13 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         await self._session.rollback()
 
 
-IUnitOfWork: type[AbstractUnitOfWork] = Annotated[AbstractUnitOfWork, Depends(SqlAlchemyUnitOfWork)]
+async def get_uow() -> AsyncGenerator[AbstractUnitOfWork, None]:
+    """
+    Dependency factory that provides the UoW with the correct session factory.
+    This prevents FastAPI from inspecting the constructor types.
+    """
+    uow = SqlAlchemyUnitOfWork(session_factory=db_helper.session_factory)
+    yield uow
+
+
+IUnitOfWork = Annotated[AbstractUnitOfWork, Depends(get_uow)]
