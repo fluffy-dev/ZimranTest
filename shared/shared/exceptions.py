@@ -15,20 +15,35 @@ class NotFoundException(FineloBaseException):
 
 
 class ConflictException(FineloBaseException):
-    """Raised when an action conflicts with the current state (e.g. duplicate)."""
+    """Raised when an action conflicts with the current state."""
 
 
 class ValidationException(FineloBaseException):
-    """Raised when business validation fails (distinct from Pydantic schema validation)."""
+    """Raised when business validation fails (distinct from Pydantic errors)."""
+
+
+class ForbiddenException(FineloBaseException):
+    """Raised when a user attempts to access a resource they do not own."""
+
+
+class InternalServerException(FineloBaseException):
+    """Raised when a critical internal failure occurs that is still a 'known' error."""
 
 
 class AttemptAlreadyCompletedException(ConflictException):
-    """Raised when trying to submit an already-completed attempt."""
+    """Raised when trying to modify or submit an already-completed attempt."""
+
+
+class AttemptExpiredException(ConflictException):
+    """
+    Raised when an attempt is too old to be modified or submitted.
+    Used by both the Reaper worker and 'Lazy Evaluation' logic.
+    """
 
 
 class InsufficientBalanceException(FineloBaseException):
     """Raised when a debit would exceed the current balance."""
 
 
-class IdempotencyMismatchError(FineloBaseException):
+class IdempotencyMismatchError(ConflictException):
     """Raised when an idempotency key is reused with a different payload."""
