@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.libs.base_model import Base
-from src.quiz.models.quiz import Question
+from src.quiz.models.question import Question
 from src.attempt.models.quiz_attempt import QuizAttempt
 
 
