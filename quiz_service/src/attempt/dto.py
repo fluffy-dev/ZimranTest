@@ -60,3 +60,9 @@ class AttemptStartResponseDTO(BaseModel):
     attempt_id: uuid.UUID
     quiz_id: uuid.UUID
     user_id: uuid.UUID
+
+class AutoSaveRequestDTO(BaseModel):
+    """
+    DTO for auto-saving a single draft answer during an active attempt.
+    """
+    answer: AnswerItemDTO
