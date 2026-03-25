@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.health.router import router as health_router
-from src.quiz.router import router as quizzes_router
+# from src.quiz.router import router as quizzes_router
 from src.attempt.router import router as attempts_router
 from src import lifespan as _lifespan
 from src.config.project import settings as project_settings
@@ -122,13 +122,9 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
         content={"error": {"code": "InternalServerError", "message": "An unexpected error occurred."}},
     )
 
-
-
-
-
 api_v1 = APIRouter(prefix='/api/v1', tags=["API"])
 
-api_v1.include_router(quizzes_router)
+# api_v1.include_router(quizzes_router)
 api_v1.include_router(attempts_router)
 
 app.include_router(health_router)
