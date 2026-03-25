@@ -7,10 +7,10 @@ from fastapi import APIRouter, Query, status
 from src.balance.dto import BalanceResponseDTO, TransactionListResponseDTO
 from src.balance.dependencies.service import IBalanceService
 
-balance_router = APIRouter(prefix="/balances", tags=["Balances"])
+router = APIRouter(prefix="/balances", tags=["Balances"])
 
 
-@balance_router.get(
+@router.get(
     "/{user_id}",
     response_model=BalanceResponseDTO,
     status_code=status.HTTP_200_OK,
@@ -34,7 +34,7 @@ async def get_user_balance(
     return await service.get_balance(user_id)
 
 
-@balance_router.get(
+@router.get(
     "/{user_id}/transactions",
     response_model=TransactionListResponseDTO,
     status_code=status.HTTP_200_OK,

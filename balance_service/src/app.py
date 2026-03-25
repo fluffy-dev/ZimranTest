@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from src.balance.router import router as balance_router
 from src.health.router import router as health_router
-from src import lifespan as _lifespan
+from src.lifespan import lifespan
 from src.config.project import settings as project_settings
 from src.config.swagger import settings as swagger_settings
 from src.config.cors import settings as cors_settings
@@ -22,14 +22,6 @@ from src.config.logging import settings as log_settings
 
 configure_logging(service_name="balance-service", log_level=log_settings.logging_level)
 logger = structlog.get_logger(__name__)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Manages service startup and graceful shutdown lifecycle."""
-    await _lifespan.startup()
-    yield
-    await _lifespan.shutdown()
 
 
 app = FastAPI(
