@@ -176,6 +176,7 @@ class CachingQuizRepository:
             title=data["title"],
             description=data["description"],
             is_active=data["is_active"],
+            question_count=data.get("question_count", len(questions)),
             questions=questions,
         )
 

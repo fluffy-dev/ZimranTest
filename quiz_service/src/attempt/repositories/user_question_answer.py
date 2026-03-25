@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import uuid
-from typing import Sequence
+from typing import Sequence, Any
 
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,6 +63,43 @@ class UserQuestionAnswerRepository:
             set_={
                 "answer_payload": stmt.excluded.answer_payload,
                 "answered_at": func.now(),
+            },
+        )
+
+        await self._session.execute(stmt)
+
+    async def bulk_upsert_graded_answers(
+        self, answers: Sequence[UserQuestionAnswerEntity]
+    ) -> None:
+        """Atomically upserts a batch of graded answers.
+
+        Leverages PostgreSQL ON CONFLICT DO UPDATE to gracefully overwrite
+        any existing draft payloads with the final graded result.
+
+        Args:
+            answers: A sequence of graded UserQuestionAnswerEntity objects.
+        """
+        if not answers:
+            return
+
+        values: list[dict[str, Any]] = [
+            {
+                "id": ans.id,
+                "attempt_id": ans.attempt_id,
+                "question_id": ans.question_id,
+                "answer_payload": ans.answer_payload,
+                "is_correct": ans.is_correct,
+            }
+            for ans in answers
+        ]
+
+        stmt = insert(UserQuestionAnswer).values(values)
+
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["attempt_id", "question_id"],
+            set_={
+                "answer_payload": stmt.excluded.answer_payload,
+                "is_correct": stmt.excluded.is_correct,
             },
         )
 

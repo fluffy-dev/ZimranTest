@@ -77,6 +77,23 @@ class QuestionRepository:
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
+    async def get_by_ids(self, ids: list[uuid.UUID]) -> list[QuestionEntity]:
+        """Retrieves multiple questions by their unique identifiers.
+
+        Args:
+            ids: A list of question UUIDs.
+
+        Returns:
+            A list of mapped QuestionEntity objects.
+        """
+        if not ids:
+            return []
+
+        result = await self._session.execute(
+            select(Question).where(Question.id.in_(ids))
+        )
+        return [self._to_entity(m) for m in result.scalars().all()]
+
     async def get_by_quiz_id(self, quiz_id: uuid.UUID) -> list[QuestionEntity]:
         """Retrieves all questions associated with a specific quiz.
 

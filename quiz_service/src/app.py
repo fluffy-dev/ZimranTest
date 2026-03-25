@@ -21,6 +21,7 @@ from shared.exceptions import (
     FineloBaseException,
     NotFoundException,
     ValidationException,
+    ForbiddenException
 )
 from shared.logging import configure_logging
 
@@ -120,6 +121,22 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"error": {"code": "InternalServerError", "message": "An unexpected error occurred."}},
+    )
+
+@app.exception_handler(AttemptAlreadyCompletedException)
+async def attempt_completed_exception_handler(request, exc: AttemptAlreadyCompletedException):
+    """Maps AttemptAlreadyCompletedException to an HTTP 409 Conflict response."""
+    return JSONResponse(
+        status_code=409,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+@app.exception_handler(ForbiddenException)
+async def forbidden_exception_handler(request, exc: ForbiddenException):
+    """Maps ForbiddenException to an HTTP 403 Forbidden response."""
+    return JSONResponse(
+        status_code=403,
+        content={"error": {"code": exc.code, "message": exc.message}},
     )
 
 api_v1 = APIRouter(prefix='/api/v1', tags=["API"])

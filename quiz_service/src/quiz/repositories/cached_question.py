@@ -125,6 +125,17 @@ class CachingQuestionRepository:
             await self._invalidate_all_quiz_structures()
         return deleted
 
+    async def get_by_ids(self, ids: list[uuid.UUID]) -> list[QuestionEntity]:
+        """Retrieves multiple questions by their unique identifiers.
+
+        Args:
+            ids: A list of question UUIDs.
+
+        Returns:
+            A list of mapped QuestionEntity objects.
+        """
+        return await self._repo.get_by_ids(ids)
+
     async def _invalidate_all_quiz_structures(self) -> None:
         """Clears all complex quiz and question collections to guarantee strict consistency."""
         async for key in self._redis.scan_iter("quiz:entity:*"):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.attempt.models.quiz_attempt import QuizAttempt
@@ -23,7 +23,8 @@ class QuizAttemptRepository:
         """
         self._session = session
 
-    def _map_to_entity(self, model: QuizAttempt) -> QuizAttemptEntity:
+    @staticmethod
+    def _map_to_entity(model: QuizAttempt) -> QuizAttemptEntity:
         return QuizAttemptEntity(
             id=model.id,
             quiz_id=model.quiz_id,
@@ -120,22 +121,23 @@ class QuizAttemptRepository:
             .values(status=AttemptStatusEnum.ABANDONED)
         )
 
-    async def bulk_mark_abandoned(self, expiration_threshold: datetime) -> int:
-        """
-        Bulk updates stalled 'in_progress' attempts to 'abandoned' based on inactivity.
+    async def bulk_mark_abandoned(self, threshold: datetime) -> int:
+        """Marks stale in-progress attempts as abandoned.
 
         Args:
-            expiration_threshold: The timestamp threshold for inactivity.
+            threshold: The datetime limit; attempts older than this are abandoned.
 
         Returns:
             The number of records updated.
         """
-        result = await self._session.execute(
+        stmt = (
             update(QuizAttempt)
-            .where(
-                QuizAttempt.status == AttemptStatusEnum.IN_PROGRESS,
-                QuizAttempt.updated_at < expiration_threshold,
+            .where(QuizAttempt.status == AttemptStatusEnum.IN_PROGRESS)
+            .where(QuizAttempt.updated_at < threshold)
+            .values(
+                status=AttemptStatusEnum.ABANDONED,
+                updated_at=func.now()
             )
-            .values(status=AttemptStatusEnum.ABANDONED)
         )
+        result = await self._session.execute(stmt)
         return result.rowcount

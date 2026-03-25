@@ -157,7 +157,7 @@ class AttemptService:
             self._validate_attempt_access(attempt, user_id, attempt_id)
 
             question_ids = [ans.question_id for ans in request.answers]
-            questions = await self._uow.quizzes.get_questions_by_ids(question_ids)
+            questions = await self._uow.questions.get_by_ids(question_ids)
 
             graded_entities = self._grade_answers(attempt_id, request, questions)
 
@@ -171,11 +171,12 @@ class AttemptService:
             attempt.updated_at = now
             attempt.completed_at = now
 
-            await self._uow.user_answers.bulk_add(graded_entities)
+            await self._uow.user_answers.bulk_upsert_graded_answers(graded_entities)
             await self._uow.quiz_attempts.update(attempt)
 
             correct_ids = [ans.question_id for ans in graded_entities if ans.is_correct]
             newly_rewarded_ids = await self._rewards.process_rewards(
+                uow=self._uow,
                 user_id=user_id,
                 quiz_id=attempt.quiz_id,
                 attempt_id=attempt_id,

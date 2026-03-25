@@ -1,8 +1,7 @@
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, field_validator
 
 import uuid
 from typing import Annotated, Literal, Union
@@ -23,11 +22,22 @@ class MultipleChoicePayload(BaseModel):
 
 
 class FillGapPayload(BaseModel):
-    """Strict schema for a fill-in-the-gap answer."""
+    """Data Transfer Object representing a strict fill-in-the-gap answer payload."""
     question_type: Literal["fill_gap"]
-    answer: str = Field(..., min_length=1, json_schema_extra={"strip_whitespace": True})
+    answer: str = Field(..., min_length=1)
 
+    @field_validator("answer")
+    @classmethod
+    def strip_whitespace(cls, value: str) -> str:
+        """Trims leading and trailing whitespace before validation processing.
 
+        Args:
+            value: The raw answer string.
+
+        Returns:
+            The sanitized string.
+        """
+        return value.strip()
 class MatchingPair(BaseModel):
     """Strict schema for a single matching pair."""
     pair_id: uuid.UUID
