@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 import uuid
 
@@ -22,4 +22,5 @@ class QuizEntity:
     title: dict[str, Any]
     description: dict[str, Any] | None
     is_active: bool
-    questions: list[QuestionEntity]
+    question_count: int = 0
+    questions: list[QuestionEntity] = field(default_factory=list)

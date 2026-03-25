@@ -1,3 +1,5 @@
+import uuid
+
 from typing import Any
 from pydantic import BaseModel, Field
 
@@ -69,3 +71,13 @@ class CreateQuizDTO(BaseModel):
     title: dict[str, str] = Field(..., description='Localized: {"en": "Title", "de": "Titel"}')
     description: dict[str, str] | None = None
     questions: list[CreateQuestionDTO] = Field(default_factory=list)
+
+
+class UpdateQuizStatusDTO(BaseModel):
+    """Data Transfer Object for explicitly updating a quiz's activation status."""
+    is_active: bool = Field(..., description="The boolean visibility state to apply.")
+
+
+class EntityCreatedResponseDTO(BaseModel):
+    """Standardized Data Transfer Object for creation endpoints returning a UUID."""
+    id: uuid.UUID = Field(..., description="The generated unique identifier.")
