@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
 import uuid
+
+from typing import Any
+from datetime import datetime
+from dataclasses import dataclass
 
 
 @dataclass(slots=True)
@@ -14,8 +16,9 @@ class QuizAttemptEntity:
     status: str
     score: int | None
     total_questions: int | None
-    started_at: Any
-    completed_at: Any | None
+    started_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None
 
 
 @dataclass(slots=True)
@@ -23,4 +26,4 @@ class AnswerEntity:
     """Domain representation of a user's answer to a single question."""
     question_id: uuid.UUID
     answer_payload: dict[str, Any]
-    is_correct: bool
+    is_correct: bool | None
