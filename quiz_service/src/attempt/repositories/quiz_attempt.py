@@ -96,3 +96,30 @@ class QuizAttemptRepository:
                 completed_at=completed_at,
             )
         )
+
+    async def mark_abandoned(self, attempt_id: uuid.UUID) -> None:
+        """
+        Updates a specific attempt's status to abandoned (e.g., user clicked 'Quit').
+        """
+        from sqlalchemy import update
+        await self._session.execute(
+            update(QuizAttempt)
+            .where(QuizAttempt.id == attempt_id)
+            .values(status=AttemptStatusEnum.ABANDONED)
+        )
+
+    async def bulk_mark_abandoned(self, expiration_threshold: datetime) -> int:
+        """
+        Marks stalled 'in_progress' attempts as 'abandoned' based on updated_at.
+        Designed for the background Reaper worker.
+        """
+        from sqlalchemy import update
+        result = await self._session.execute(
+            update(QuizAttempt)
+            .where(
+                QuizAttempt.status == AttemptStatusEnum.IN_PROGRESS,
+                QuizAttempt.updated_at < expiration_threshold,
+            )
+            .values(status=AttemptStatusEnum.ABANDONED)
+        )
+        return result.rowcount
