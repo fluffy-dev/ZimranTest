@@ -84,8 +84,8 @@ services:
         alembic upgrade head
       "
     working_dir: /home/finelo/app
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@quiz_db:5432/quiz_db
+    env_file:
+      - ./quiz_service/.env
     depends_on:
       quiz_db:
         condition: service_healthy
@@ -106,8 +106,8 @@ services:
         alembic upgrade head
       "
     working_dir: /home/finelo/app
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@balance_db:5432/balance_db
+    env_file:
+      - ./balance_service/.env
     depends_on:
       balance_db:
         condition: service_healthy
