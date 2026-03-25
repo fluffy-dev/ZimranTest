@@ -7,9 +7,13 @@ from sqlalchemy.orm import selectinload
 from src.config.database.session import ISession
 from src.quiz.models.quiz import Quiz, Question
 from src.quiz.entities import QuizEntity, QuestionEntity
+from shared.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _map_question_entity(q: Question) -> QuestionEntity:
+    """Helper to map a Question model to a QuestionEntity."""
     return QuestionEntity(
         id=q.id,
         type=q.type,
@@ -20,6 +24,7 @@ def _map_question_entity(q: Question) -> QuestionEntity:
 
 
 def _map_quiz_entity(q: Quiz) -> QuizEntity:
+    """Helper to map a Quiz model to a QuizEntity."""
     return QuizEntity(
         id=q.id,
         title=q.title,
@@ -30,25 +35,28 @@ def _map_quiz_entity(q: Quiz) -> QuizEntity:
 
 
 class QuizRepository:
-    """
-    Data access layer for quizzes and questions. 
-    Retrieves and maps database models to localized domain entities.
+    """Data access layer for quizzes and questions.
+    
+    Retrieves and maps database models to domain entities.
     """
 
     def __init__(self, session: ISession) -> None:
-        """Initializes the repository with a database session."""
+        """Initializes the repository with a database session.
+
+        Args:
+            session: SQLAlchemy async session.
+        """
         self._session = session
 
     async def get_all_active(self, limit: int = 50, offset: int = 0) -> list[QuizEntity]:
-        """
-        Retrieves a paginated list of all active quizzes.
+        """Retrieves a paginated list of all active quizzes.
 
         Args:
             limit: Maximum number of quizzes to return.
-            offset: Number of quizzes to skip for pagination.
+            offset: Number of items to skip.
 
         Returns:
-            list[QuizEntity]: List of active quiz domain entities.
+            list[QuizEntity]: List of active quiz entities.
         """
         result = await self._session.execute(
             select(Quiz)
@@ -61,11 +69,10 @@ class QuizRepository:
         return [_map_quiz_entity(q) for q in result.scalars().all()]
 
     async def count_active(self) -> int:
-        """
-        Counts the total number of active quizzes in the system.
+        """Counts the total number of active quizzes.
 
         Returns:
-            int: The count of active quizzes.
+            int: The total count.
         """
         result = await self._session.execute(
             select(func.count()).select_from(Quiz).where(Quiz.is_active.is_(True))
@@ -73,14 +80,13 @@ class QuizRepository:
         return result.scalar_one()
 
     async def get_by_id(self, quiz_id: uuid.UUID) -> QuizEntity | None:
-        """
-        Retrieves a specific quiz by its ID, eagerly loading its questions.
+        """Retrieves a specific quiz by its ID.
 
         Args:
-            quiz_id: The unique identifier of the quiz.
+            quiz_id: Unique identifier for the quiz.
 
         Returns:
-            QuizEntity | None: The found quiz domain entity or None.
+            QuizEntity | None: The found entity or None.
         """
         result = await self._session.execute(
             select(Quiz)
@@ -91,14 +97,13 @@ class QuizRepository:
         return _map_quiz_entity(quiz) if quiz else None
 
     async def get_questions_by_ids(self, question_ids: list[uuid.UUID]) -> list[QuestionEntity]:
-        """
-        Retrieves multiple questions by their unique identifiers.
+        """Retrieves multiple questions by their IDs.
 
         Args:
             question_ids: List of question IDs to fetch.
 
         Returns:
-            list[QuestionEntity]: List of found question domain entities.
+            list[QuestionEntity]: List of found question entities.
         """
         result = await self._session.execute(
             select(Question).where(Question.id.in_(question_ids))
@@ -106,22 +111,17 @@ class QuizRepository:
         return [_map_question_entity(q) for q in result.scalars().all()]
 
     async def create(self, title: dict[str, Any], description: dict[str, Any] | None = None) -> QuizEntity:
-        """
-        Creates a new quiz record in the database.
+        """Creates a new quiz record.
 
         Args:
-            title: Localization dictionary for the quiz title.
-            description: Optional localization dictionary for the description.
+            title: Localized title dictionary.
+            description: Optional localized description dictionary.
 
         Returns:
-            QuizEntity: The newly created quiz domain entity.
+            QuizEntity: Domain representation of the created quiz.
         """
         quiz = Quiz(title=title, description=description)
         self._session.add(quiz)
-        await self._session.flush()
-        await self._session.refresh(quiz)
-        
-        # We need to manually initialize the empty Relationship to map it correctly
         quiz.questions = [] 
         return _map_quiz_entity(quiz)
 
@@ -133,18 +133,17 @@ class QuizRepository:
         payload: dict[str, Any],
         order_index: int,
     ) -> QuestionEntity:
-        """
-        Creates and adds a new question to a specific quiz.
+        """Adds a new question to an existing quiz.
 
         Args:
-            quiz_id: ID of the quiz to which the question belongs.
-            question_type: The type of the question (e.g., 'single_choice').
-            text: Localization dictionary for the question text.
-            payload: Type-specific logic/content payload.
-            order_index: Position of the question within the quiz.
+            quiz_id: ID of the parent quiz.
+            question_type: Type of question being added.
+            text: Localized question text.
+            payload: Question-specific configuration payload.
+            order_index: Position index for sorting.
 
         Returns:
-            QuestionEntity: The newly created question domain entity.
+            QuestionEntity: Domain representation of the added question.
         """
         question = Question(
             quiz_id=quiz_id,
@@ -154,17 +153,18 @@ class QuizRepository:
             order_index=order_index,
         )
         self._session.add(question)
-        await self._session.flush()
         return _map_question_entity(question)
 
     async def set_active(self, quiz_id: uuid.UUID, *, is_active: bool) -> None:
-        """
-        Updates the active status of a quiz.
+        """Updates the activation status of a quiz.
 
         Args:
-            quiz_id: The unique identifier of the quiz.
-            is_active: The boolean status to set.
+            quiz_id: Unique identifier for the quiz.
+            is_active: Status to set.
         """
-        await self._session.execute(
-            update(Quiz).where(Quiz.id == quiz_id).values(is_active=is_active)
-        )
+        result = await self._session.execute(select(Quiz).where(Quiz.id == quiz_id))
+        quiz = result.scalar_one_or_none()
+        if quiz:
+            quiz.is_active = is_active
+        else:
+            logger.warning(f"Quiz {quiz_id} not found for activation update.")

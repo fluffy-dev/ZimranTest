@@ -3,12 +3,9 @@ from typing import Any
 import uuid
 
 
-@dataclass
+@dataclass(slots=True)
 class QuestionEntity:
-    """
-    Domain entity representing a single question.
-    Contains localized text and technical payload for the question type.
-    """
+    """Domain representation of a quiz question."""
 
     id: uuid.UUID
     type: str
@@ -17,12 +14,9 @@ class QuestionEntity:
     payload: dict[str, Any]
 
 
-@dataclass
+@dataclass(slots=True)
 class QuizEntity:
-    """
-    Domain entity representing a Quiz.
-    Holds core quiz data and the list of associated questions.
-    """
+    """Domain representation of a quiz."""
 
     id: uuid.UUID
     title: dict[str, Any]

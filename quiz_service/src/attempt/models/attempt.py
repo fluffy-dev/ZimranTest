@@ -11,6 +11,8 @@ from sqlalchemy import (
     Integer,
     String,
     func,
+    Enum as SQLEnum,
+    CheckConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,6 +38,7 @@ class QuizAttempt(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     status: Mapped[AttemptStatusEnum] = mapped_column(
+        SQLEnum(AttemptStatusEnum, native_enum=False, length=20),
         String(20), default=AttemptStatusEnum.IN_PROGRESS, nullable=False
     )
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -53,9 +56,10 @@ class QuizAttempt(Base):
     )
 
     __table_args__ = (
-        Index("idx_quiz_attempts_user_id", "user_id"),
         Index("idx_quiz_attempts_quiz_id", "quiz_id"),
         Index("idx_quiz_attempts_user_quiz", "user_id", "quiz_id"),
+        CheckConstraint('score >= 0', name='check_score_positive'),
+        CheckConstraint('total_questions > 0', name='check_total_questions_positive'),
     )
 
 

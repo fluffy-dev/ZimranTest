@@ -16,7 +16,6 @@ from shared.messaging.rabbitmq import RabbitMQPublisher
 
 logger = get_logger(__name__)
 
-# Module-level singletons (set during lifespan)
 redis_client: aioredis.Redis | None = None
 _publisher: MessagePublisher | None = None
 _outbox_task: asyncio.Task | None = None
@@ -53,6 +52,7 @@ async def _run_outbox_poller() -> None:
                             message_id=str(event.id),
                         )
                         await repo.mark_published(event.id)
+                        await session.commit()
                         logger.info(
                             "Outbox event published",
                             event_id=str(event.id),
@@ -65,6 +65,7 @@ async def _run_outbox_poller() -> None:
                             error=str(exc),
                         )
                         await repo.increment_attempts(event.id)
+                        await session.commit()
 
         except asyncio.CancelledError:
             logger.info("Outbox poller shutting down")
@@ -76,6 +77,10 @@ async def _run_outbox_poller() -> None:
 
 
 async def startup() -> None:
+    """Initializes external connections and starts background services.
+    
+    Sets up Redis, RabbitMQ, and the outbox poller.
+    """
     global redis_client, _publisher, _outbox_task
 
     # Redis
@@ -97,6 +102,7 @@ async def startup() -> None:
 
 
 async def shutdown() -> None:
+    """Closes all background tasks and connections gracefully."""
     global redis_client, _publisher, _outbox_task
 
     if _outbox_task:

@@ -1,5 +1,4 @@
 import uuid
-
 from fastapi import APIRouter, Query, status
 
 from src.dependencies.common import ILocale
@@ -48,5 +47,6 @@ async def create_quiz(
 ) -> QuizDetailResponseDTO:
     """
     Creates a basic quiz with a list of polymorphic questions.
+    Returns the created quiz localized to English.
     """
     return await service.create_quiz(body)

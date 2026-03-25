@@ -1,5 +1,4 @@
 import uuid
-
 from fastapi import APIRouter
 
 from src.dependencies.common import IUserID
