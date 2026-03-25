@@ -7,7 +7,7 @@ from shared.schemas import QuizRewardEvent, QuizRewardPayload
 from src.attempt.entities import OutboxEventEntity, UserRewardedQuestionEntity
 from src.config.project import settings as project_settings
 from src.uow import AbstractUnitOfWork
-
+from src.config.rabbitmq import settings as rabbitmq_settings
 
 class RewardService:
     """Service for calculating idempotent quiz rewards and staging outbox events.
@@ -76,7 +76,7 @@ class RewardService:
         outbox_entity = OutboxEventEntity(
             id=uuid.uuid4(),
             event_type="quiz.rewarded",
-            routing_key="finance.reward",
+            routing_key=rabbitmq_settings.routing_key,
             payload=event_payload.model_dump(mode="json"),
             created_at=now,
             published_at=None,
