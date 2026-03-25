@@ -150,4 +150,4 @@ async def get_uow(redis: IRedis) -> AsyncGenerator[AbstractUnitOfWork, None]:
     yield uow
 
 
-IUnitOfWork = Annotated[AbstractUnitOfWork, Depends(get_uow)]
+IUnitOfWork: type[AbstractUnitOfWork] = Annotated[AbstractUnitOfWork, Depends(get_uow)]
