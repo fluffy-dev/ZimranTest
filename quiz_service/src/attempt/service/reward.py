@@ -3,36 +3,30 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from src.uow import IUnitOfWork
-from src.config.project import settings as project_settings
-from src.attempt.entities import UserRewardedQuestionEntity, OutboxEventEntity
 from shared.schemas import QuizRewardEvent, QuizRewardPayload
-from shared.exceptions import InternalServerException
+from src.attempt.entities import OutboxEventEntity, UserRewardedQuestionEntity
+from src.config.project import settings as project_settings
+from src.uow import AbstractUnitOfWork
 
 
 class RewardService:
-    """Service for calculating idempotent quiz rewards and staging outbox events."""
+    """Service for calculating idempotent quiz rewards and staging outbox events.
 
-    def __init__(self, uow: IUnitOfWork) -> None:
-        """
-        Initializes the service with a Unit of Work.
-
-        Args:
-            uow: Database Unit of Work instance.
-        """
-        self._uow = uow
-
+    Operates statelessly regarding transactions, requiring the caller to provide
+    the active Unit of Work boundary.
+    """
+    @staticmethod
     async def process_rewards(
-        self,
-        user_id: uuid.UUID,
-        quiz_id: uuid.UUID,
-        attempt_id: uuid.UUID,
-        correct_question_ids: list[uuid.UUID],
+            uow: AbstractUnitOfWork,
+            user_id: uuid.UUID,
+            quiz_id: uuid.UUID,
+            attempt_id: uuid.UUID,
+            correct_question_ids: list[uuid.UUID],
     ) -> list[uuid.UUID]:
-        """
-        Calculates idempotent rewards and stages the outbox event in the current transaction.
+        """Calculates idempotent rewards and stages the outbox event.
 
         Args:
+            uow: The active database Unit of Work instance.
             user_id: ID of the user.
             quiz_id: ID of the quiz.
             attempt_id: ID of the attempt.
@@ -44,7 +38,7 @@ class RewardService:
         if not correct_question_ids:
             return []
 
-        already_rewarded_ids = await self._uow.user_rewards.get_rewarded_ids_by_questions(
+        already_rewarded_ids = await uow.user_rewards.get_rewarded_ids_by_questions(
             user_id, correct_question_ids
         )
 
@@ -65,7 +59,7 @@ class RewardService:
             )
             for qid in newly_rewarded_ids
         ]
-        await self._uow.user_rewards.bulk_add(reward_entities)
+        await uow.user_rewards.bulk_add(reward_entities)
 
         coins = len(newly_rewarded_ids) * project_settings.quiz_coins_per_correct_answer
 
@@ -88,6 +82,6 @@ class RewardService:
             published_at=None,
             attempts=0,
         )
-        await self._uow.outbox.add(outbox_entity)
+        await uow.outbox.add(outbox_entity)
 
         return newly_rewarded_ids
