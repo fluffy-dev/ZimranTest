@@ -1,66 +1,68 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+import uuid
 
-from src.dependencies.common import IUserID
+from fastapi import APIRouter, Query, status
+
+from src.balance.dto import BalanceResponseDTO, TransactionListResponseDTO
 from src.balance.dependencies.service import IBalanceService
-from src.balance.dto import BalanceResponseDTO, TransactionListResponseDTO, TransactionResponseDTO
 
-router = APIRouter(prefix="/balance", tags=["Balance"])
+balance_router = APIRouter(prefix="/balances", tags=["Balances"])
 
 
-@router.get("", response_model=BalanceResponseDTO, summary="Get current balance")
-async def get_balance(
-    user_id: IUserID,
+@balance_router.get(
+    "/{user_id}",
+    response_model=BalanceResponseDTO,
+    status_code=status.HTTP_200_OK,
+)
+async def get_user_balance(
+    user_id: uuid.UUID,
     service: IBalanceService,
 ) -> BalanceResponseDTO:
-    """Return the caller's current virtual coin balance.
+    """Retrieves the current balance for a specified user.
 
-    Reads the ``X-User-ID`` header (injected as ``user_id`` via
-    :data:`~src.dependencies.common.IUserID`) and fetches the user's balance
-    from the service layer. If the user has no balance record yet, one is
-    transparently created with ``amount=0``.
+    If the user does not have an active balance ledger, a zero-value balance
+    is safely initialized and returned.
 
     Args:
-        user_id: Caller's UUID extracted and validated from the
-            ``X-User-ID`` request header.
-        service: Injected :class:`~src.balance.service.balance.BalanceService`
-            instance.
+        user_id: The UUID identifying the user.
+        service: The injected BalanceService.
 
     Returns:
-        A :class:`~src.balance.dto.BalanceResponseDTO` containing ``user_id``,
-        current ``amount``, and ``updated_at`` timestamp.
+        A BalanceResponseDTO containing the user's current coin aggregate.
     """
-    return await service.get_balance(user_id=user_id)
+    return await service.get_balance(user_id)
 
 
-@router.get("/transactions", response_model=TransactionListResponseDTO, summary="Transaction history")
-async def get_transactions(
-    user_id: IUserID,
+@balance_router.get(
+    "/{user_id}/transactions",
+    response_model=TransactionListResponseDTO,
+    status_code=status.HTTP_200_OK,
+)
+async def get_user_transactions(
+    user_id: uuid.UUID,
     service: IBalanceService,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=50, ge=1, le=100),
+    page: int = Query(1, ge=1, description="The 1-based page number to retrieve."),
+    page_size: int = Query(
+        50, ge=1, le=100, description="The maximum number of transactions per page."
+    ),
 ) -> TransactionListResponseDTO:
-    """Return a paginated, newest-first list of the caller's transactions.
+    """Retrieves a paginated list of a user's transaction history.
 
-    Reads the ``X-User-ID`` header for the user identity and delegates to
-    the service layer for pagination and retrieval. Transactions are sorted
-    by ``created_at DESC``.
+    Transactions are returned in descending chronological order (newest first).
 
     Args:
-        user_id: Caller's UUID extracted and validated from the
-            ``X-User-ID`` request header.
-        service: Injected :class:`~src.balance.service.balance.BalanceService`
-            instance.
-        page: 1-based page number to retrieve. Must be ``>= 1``.
-            Defaults to ``1``.
-        page_size: Number of records to return per page. Must be between
-            ``1`` and ``100`` inclusive. Defaults to ``50``.
+        user_id: The UUID identifying the user.
+        service: The injected BalanceService.
+        page: The requested page index.
+        page_size: The pagination page size limit.
 
     Returns:
-        A :class:`~src.balance.dto.TransactionListResponseDTO` containing the
-        paginated ``items`` list along with echoed ``page`` and ``page_size``
-        metadata.
+        A TransactionListResponseDTO containing the transaction array and
+        pagination metadata.
     """
-    return await service.get_transactions(user_id=user_id, page=page, page_size=page_size)
-
+    return await service.get_transactions(
+        user_id=user_id,
+        page=page,
+        page_size=page_size,
+    )
