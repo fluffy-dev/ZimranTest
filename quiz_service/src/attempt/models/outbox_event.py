@@ -2,14 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import (
-    Column,
-    DateTime,
-    Index,
-    Integer,
-    String,
-    func
-)
+from sqlalchemy import Column, DateTime, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,7 +12,7 @@ from src.libs.base_model import Base
 class OutboxEvent(Base):
     """
     SQLAlchemy model for the Transactional Outbox pattern.
-    Stores events that need to be published to external systems (e.g., RabbitMQ).
+    Guarantees reliable message delivery to message brokers.
     """
 
     __tablename__ = "outbox_events"
@@ -30,6 +23,7 @@ class OutboxEvent(Base):
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     routing_key: Mapped[str] = mapped_column(String(200), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -40,7 +34,7 @@ class OutboxEvent(Base):
 
     __table_args__ = (
         Index(
-            "idx_outbox_pending",
+            "idx_outbox_pending_events",
             "published_at",
             postgresql_where=Column("published_at").is_(None),
         ),
