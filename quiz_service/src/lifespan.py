@@ -2,108 +2,170 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
+from typing import Optional
 
 import redis.asyncio as aioredis
 
 from src.config.redis import settings as redis_settings
 from src.config.rabbitmq import settings as rmq_settings
 from src.config.outbox import settings as outbox_settings
-from src.config.database.session import AsyncSessionFactory
-from src.attempt.repositories.outbox import OutboxRepository
+from src.config.database.engine import db_helper
+from src.attempt.repositories.outbox_event import OutboxEventRepository
+from src.attempt.entities import OutboxEventEntity
 from shared.logging import get_logger
 from shared.messaging import MessagePublisher
 from shared.messaging.rabbitmq import RabbitMQPublisher
 
 logger = get_logger(__name__)
 
-redis_client: aioredis.Redis | None = None
-_publisher: MessagePublisher | None = None
-_outbox_task: asyncio.Task | None = None
+# Global resource holders for dependency injection
+redis_client: Optional[aioredis.Redis] = None
+_publisher: Optional[MessagePublisher] = None
+_outbox_task: Optional[asyncio.Task] = None
 
 
-async def _run_outbox_poller() -> None:
+class OutboxProcessor:
     """
-    Background task that reads pending outbox events and publishes them to RabbitMQ.
-    Runs every OUTBOX_POLL_INTERVAL seconds.
+    Orchestrates the 'Relay' phase of the Transactional Outbox pattern.
 
-    This implements the Polling Publisher variant of the Transactional Outbox pattern:
-    - Atomically written with DB writes
-    - Independently published by this background worker
-    - Guarantees at-least-once delivery
-    - Balance service is idempotent (handles duplicates via idempotency_key)
+    Processes pending OutboxEvent entities and ensures at-least-once
+    delivery to the configured message broker.
     """
-    global _publisher
-    assert _publisher is not None
 
-    logger.info("Outbox poller started", interval=outbox_settings.poll_interval)
+    def __init__(self, publisher: MessagePublisher) -> None:
+        """
+        Initializes the processor with a connected publisher.
 
-    while True:
+        Args:
+            publisher: Implementation of the MessagePublisher interface.
+        """
+        self._publisher = publisher
+        self._session_factory = db_helper.session_factory
+
+    async def run(self) -> None:
+        """
+        The main execution loop for the outbox poller.
+        """
+        logger.info("Outbox poller starting", interval=outbox_settings.poll_interval)
         try:
-            async with AsyncSessionFactory() as session:
-                repo = OutboxRepository(session)
-                events = await repo.get_pending_events(batch_size=outbox_settings.batch_size)
+            while True:
+                processed = await self._process_next_batch()
 
-                for event in events:
-                    try:
-                        body = json.dumps(event.payload).encode()
-                        await _publisher.publish(
-                            routing_key=event.routing_key,
-                            body=body,
-                            message_id=str(event.id),
-                        )
-                        await repo.mark_published(event.id)
-                        await session.commit()
-                        logger.info(
-                            "Outbox event published",
-                            event_id=str(event.id),
-                            event_type=event.event_type,
-                        )
-                    except Exception as exc:
-                        logger.error(
-                            "Failed to publish outbox event",
-                            event_id=str(event.id),
-                            error=str(exc),
-                        )
-                        await repo.increment_attempts(event.id)
-                        await session.commit()
-
+                # If no events were found, sleep; otherwise, check immediately for next batch
+                if processed == 0:
+                    await asyncio.sleep(outbox_settings.poll_interval)
         except asyncio.CancelledError:
-            logger.info("Outbox poller shutting down")
-            return
+            logger.info("Outbox poller task received cancellation signal")
         except Exception as exc:
-            logger.error("Outbox poller iteration error", error=str(exc))
+            logger.exception("Outbox poller encountered unhandled exception", error=str(exc))
 
-        await asyncio.sleep(outbox_settings.poll_interval)
+    async def _process_next_batch(self) -> int:
+        """
+        Fetches and publishes a single batch of events.
+
+        Returns:
+            The number of successfully processed events.
+        """
+        async with self._session_factory() as session:
+            repo = OutboxEventRepository(session)
+            events = await repo.get_pending_events(batch_size=outbox_settings.batch_size)
+
+            if not events:
+                return 0
+
+            for event in events:
+                if not await self._handle_event(repo, event, session):
+                    # Broker connection failure: stop batch and wait for reconnect
+                    break
+
+            return len(events)
+
+    async def _handle_event(
+            self,
+            repo: OutboxEventRepository,
+            event: OutboxEventEntity,
+            session
+    ) -> bool:
+        """
+        Publishes a single event and updates its database status.
+
+        Returns:
+            bool: True if iteration should continue, False on broker failure.
+        """
+        try:
+            # Serialize the dict payload to bytes for the broker
+            payload_bytes = json.dumps(event.payload).encode()
+
+            await self._publisher.publish(
+                routing_key=event.routing_key,
+                body=payload_bytes,
+                message_id=str(event.id),
+            )
+
+            # Update entity state and persist via repository
+            event.published_at = datetime.now(tz=timezone.utc)
+            await repo.mark_published(event)
+            await session.commit()
+
+            logger.info("Outbox event published", event_id=str(event.id), type=event.event_type)
+            return True
+
+        except (ConnectionError, TimeoutError) as net_err:
+            logger.error("Message broker unreachable", error=str(net_err))
+            await session.rollback()
+            return False
+
+        except Exception as exc:
+            logger.error("Failed to process outbox event", event_id=str(event.id), error=str(exc))
+            await repo.increment_attempts(event)
+            await session.commit()
+            return True
 
 
 async def startup() -> None:
-    """Initializes external connections and starts background services.
-    
-    Sets up Redis, RabbitMQ, and the outbox poller.
+    """
+    Bootstraps the application's external dependencies and background tasks.
     """
     global redis_client, _publisher, _outbox_task
 
-    # Redis
-    redis_client = aioredis.from_url(
-        redis_settings.url, encoding="utf-8", decode_responses=True
-    )
-    await redis_client.ping()
-    logger.info("Redis connected", url=redis_settings.url)
+    # 1. Initialize Redis
+    try:
+        redis_client = aioredis.from_url(
+            redis_settings.url,
+            encoding="utf-8",
+            decode_responses=True
+        )
+        await redis_client.ping()
+        logger.info("Redis connection established")
+    except Exception as exc:
+        logger.critical("Failed to connect to Redis", error=str(exc))
+        raise
 
-    # Publisher — swap class here to change broker
-    _publisher = RabbitMQPublisher(
-        url=rmq_settings.url,
-        exchange_name=rmq_settings.exchange,
-    )
-    await _publisher.connect()
+    # 2. Initialize RabbitMQ Publisher
+    try:
+        _publisher = RabbitMQPublisher(
+            url=rmq_settings.url,
+            exchange_name=rmq_settings.exchange,
+        )
+        await _publisher.connect()
+        logger.info("RabbitMQ publisher connected")
+    except Exception as exc:
+        logger.critical("Failed to connect to RabbitMQ", error=str(exc))
+        raise
 
-    # Start outbox poller background task
-    _outbox_task = asyncio.create_task(_run_outbox_poller())
+    # 3. Start Outbox Poller
+    processor = OutboxProcessor(_publisher)
+    _outbox_task = asyncio.create_task(processor.run(), name="outbox_poller")
 
 
 async def shutdown() -> None:
-    """Closes all background tasks and connections gracefully."""
+    """
+    Gracefully terminates all background tasks and external connections.
+    """
     global redis_client, _publisher, _outbox_task
+
+    logger.info("Initiating graceful shutdown")
 
     if _outbox_task:
         _outbox_task.cancel()
@@ -111,10 +173,12 @@ async def shutdown() -> None:
             await _outbox_task
         except asyncio.CancelledError:
             pass
+        logger.info("Outbox poller task terminated")
 
     if _publisher:
         await _publisher.close()
+        logger.info("RabbitMQ publisher disconnected")
 
     if redis_client:
         await redis_client.aclose()
-        logger.info("Redis disconnected")
+        logger.info("Redis connection closed")
