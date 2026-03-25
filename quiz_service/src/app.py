@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import structlog
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -124,6 +124,12 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
 
 
 
+
+
+api_v1 = APIRouter(prefix='/api/v1', tags=["API"])
+
+api_v1.include_router(quizzes_router)
+api_v1.include_router(attempts_router)
+
 app.include_router(health_router)
-app.include_router(quizzes_router, prefix="/api/v1")
-app.include_router(attempts_router, prefix="/api/v1")
+app.include_router(api_v1)
