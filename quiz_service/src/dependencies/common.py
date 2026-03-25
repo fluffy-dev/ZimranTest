@@ -7,6 +7,7 @@ from uuid import UUID
 import redis.asyncio as aioredis
 from fastapi import Depends, Header
 from fastapi.exceptions import HTTPException
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database.engine import db_helper
@@ -21,7 +22,7 @@ def _get_redis() -> aioredis.Redis:
     return redis_client
 
 
-IRedis = Annotated[aioredis.Redis, Depends(_get_redis)]
+IRedis: type[Redis] = Annotated[aioredis.Redis, Depends(_get_redis)]
 
 
 def get_user_id(x_user_id: str = Header(..., alias="X-User-ID")) -> uuid.UUID:
