@@ -10,12 +10,12 @@ class Settings(BaseSettings):
     such as connection pool sizes and query logging flags.
     """
     db_url_scheme: str = Field("postgresql+asyncpg", alias="DB_URL_SCHEME")
-    db_host: str = Field(..., alias="DB_HOST")
-    db_port: str = Field(..., alias="DB_PORT")
-    db_name: str = Field(..., alias="DB_NAME")
+    db_host: str = Field("localhost", alias="DB_HOST")
+    db_port: str = Field("5432", alias="DB_PORT")
+    db_name: str = Field("test_db", alias="DB_NAME")
     
-    db_user: str = Field(..., alias="DB_USER")
-    db_password: str = Field(..., alias="DB_PASSWORD")
+    db_user: str = Field("test_user", alias="DB_USER")
+    db_password: str = Field("test_password", alias="DB_PASSWORD")
     
     db_echo_log: bool = Field(False, alias="DB_ECHO_LOG")
     db_run_auto_migrate: bool = Field(False, alias="DB_RUN_AUTO_MIGRATE")

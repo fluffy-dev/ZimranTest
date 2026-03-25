@@ -25,7 +25,7 @@ class MultipleChoicePayload(BaseModel):
 class FillGapPayload(BaseModel):
     """Strict schema for a fill-in-the-gap answer."""
     question_type: Literal["fill_gap"]
-    answer: str = Field(..., min_length=1, strip_whitespace=True)
+    answer: str = Field(..., min_length=1, json_schema_extra={"strip_whitespace": True})
 
 
 class MatchingPair(BaseModel):

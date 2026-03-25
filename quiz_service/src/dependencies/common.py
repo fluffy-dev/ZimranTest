@@ -24,7 +24,7 @@ def _get_redis() -> aioredis.Redis:
 IRedis = Annotated[aioredis.Redis, Depends(_get_redis)]
 
 
-def _get_user_id(x_user_id: str = Header(..., alias="X-User-ID")) -> uuid.UUID:
+def get_user_id(x_user_id: str = Header(..., alias="X-User-ID")) -> uuid.UUID:
     """Extracts and validates the caller's UUID from the X-User-ID request header."""
     try:
         return uuid.UUID(x_user_id)
@@ -35,7 +35,7 @@ def _get_user_id(x_user_id: str = Header(..., alias="X-User-ID")) -> uuid.UUID:
         )
 
 
-IUserID: type[UUID] = Annotated[uuid.UUID, Depends(_get_user_id)]
+IUserID: type[UUID] = Annotated[uuid.UUID, Depends(get_user_id)]
 
 
 def _get_locale(accept_language: str = Header(default="en")) -> str:
