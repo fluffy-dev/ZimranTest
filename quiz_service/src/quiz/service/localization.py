@@ -121,11 +121,11 @@ class QuizLocalizationService:
             locale: The requested ISO language code.
 
         Returns:
-            A validated QuizListItemDTO containing basic metadata and question counts.
+            A validated QuizListItemDTO containing basic metadata and pre-calculated counts.
         """
         return QuizListItemDTO(
             id=str(entity.id),
             title=self.extract_text(entity.title, locale),
             description=self.extract_text(entity.description, locale),
-            question_count=len(entity.questions),
+            question_count=entity.question_count,
         )

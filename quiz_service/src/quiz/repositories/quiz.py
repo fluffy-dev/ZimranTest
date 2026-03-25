@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.quiz.entities import QuestionEntity, QuizEntity
+from src.quiz.models.question import Question
 from src.quiz.models.quiz import Quiz
 
 
 class QuizRepository:
-    """Provides data access operations for Quiz entities.
+    """
+    Provides data access operations for Quiz entities.
 
     Enforces an Entity-in / Entity-out contract and optimizes read/write
     operations for the core Quiz domain.
@@ -27,10 +29,10 @@ class QuizRepository:
 
     @staticmethod
     def _to_entity(model: Quiz) -> QuizEntity:
-        """Maps a Quiz SQLAlchemy model to a QuizEntity domain object.
+        """Maps a fully loaded Quiz SQLAlchemy model to a QuizEntity.
 
         Args:
-            model: The SQLAlchemy Quiz model.
+            model: The SQLAlchemy Quiz model with eagerly loaded questions.
 
         Returns:
             The mapped QuizEntity containing nested questions.
@@ -51,7 +53,28 @@ class QuizRepository:
             title=model.title,
             description=model.description,
             is_active=model.is_active,
+            question_count=len(questions),
             questions=questions,
+        )
+
+    @staticmethod
+    def _to_summary_entity(model: Quiz, question_count: int) -> QuizEntity:
+        """Maps a lightweight Quiz SQLAlchemy model to a QuizEntity.
+
+        Args:
+            model: The SQLAlchemy Quiz model without nested questions.
+            question_count: The pre-calculated integer count of questions.
+
+        Returns:
+            The mapped QuizEntity configured for summary list views.
+        """
+        return QuizEntity(
+            id=model.id,
+            title=model.title,
+            description=model.description,
+            is_active=model.is_active,
+            question_count=question_count,
+            questions=[],
         )
 
     @staticmethod
@@ -62,7 +85,7 @@ class QuizRepository:
             entity: The QuizEntity domain object.
 
         Returns:
-            The mapped Quiz model without nested questions (handled independently).
+            The mapped Quiz model.
         """
         return Quiz(
             id=entity.id,
@@ -72,7 +95,7 @@ class QuizRepository:
         )
 
     async def get_by_id(self, quiz_id: uuid.UUID) -> QuizEntity | None:
-        """Retrieves a quiz by its unique identifier, eager-loading questions.
+        """Retrieves a fully hydrated quiz by its unique identifier.
 
         Args:
             quiz_id: The UUID of the quiz.
@@ -89,24 +112,33 @@ class QuizRepository:
         return self._to_entity(model) if model else None
 
     async def get_all_active(self, limit: int, offset: int) -> list[QuizEntity]:
-        """Retrieves a paginated list of active quizzes.
+        """Retrieves a paginated list of active quizzes with computed question counts.
 
         Args:
             limit: The maximum number of records to return.
             offset: The number of records to skip.
 
         Returns:
-            A list of mapped active QuizEntity objects.
+            A list of mapped active QuizEntity objects optimized for summary display.
         """
-        result = await self._session.execute(
-            select(Quiz)
+        count_stmt = (
+            select(func.count(Question.id))
+            .where(Question.quiz_id == Quiz.id)
+            .correlate(Quiz)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(Quiz, count_stmt.label("question_count"))
             .where(Quiz.is_active.is_(True))
             .order_by(Quiz.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
-        models = result.scalars().all()
-        return [self._to_entity(model) for model in models]
+
+        result = await self._session.execute(stmt)
+        rows = result.all()
+        return [self._to_summary_entity(row.Quiz, row.question_count) for row in rows]
 
     async def count_active(self) -> int:
         """Aggregates the total count of active quizzes.
@@ -154,15 +186,12 @@ class QuizRepository:
             entity: The fully updated QuizEntity.
 
         Returns:
-            True if the record was successfully updated, False if not found.
+            True if updated, False if not found.
         """
         stmt = (
             update(Quiz)
             .where(Quiz.id == entity.id)
-            .values(
-                title=entity.title,
-                description=entity.description,
-            )
+            .values(title=entity.title, description=entity.description)
         )
         result = await self._session.execute(stmt)
         return result.rowcount > 0
