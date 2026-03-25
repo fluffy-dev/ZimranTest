@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, String, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, String, func, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -51,9 +51,15 @@ class BalanceTransaction(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    type: Mapped[TransactionType] = mapped_column(String(10), nullable=False)
+
+    type: Mapped[TransactionType] = mapped_column(
+        SQLEnum(TransactionType, native_enum=False, length=10),
+        nullable=False
+    )
+
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     idempotency_key: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -61,8 +67,5 @@ class BalanceTransaction(Base):
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_txn_amount_positive"),
-        CheckConstraint(
-            "type IN ('credit', 'debit')", name="ck_txn_type_valid"
-        ),
         Index("idx_txn_user_id", "user_id"),
     )
