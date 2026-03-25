@@ -5,7 +5,7 @@ from typing import AsyncGenerator
 import uuid
 
 import structlog
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -117,6 +117,10 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
         },
     )
 
+router = APIRouter(prefix="/api/v1", tags=["API"])
 
+
+router.include_router(balance_router)
+
+app.include_router(router)
 app.include_router(health_router)
-app.include_router(balance_router, prefix="/api/v1")
