@@ -1,71 +1,76 @@
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Annotated
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.attempt.repositories.attempt import AttemptRepository
-from src.attempt.repositories.outbox import OutboxRepository
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from src.config.database.engine import db_helper
+from src.attempt.repositories.quiz_attempt import QuizAttemptRepository
+from src.attempt.repositories.user_question_answer import UserQuestionAnswerRepository
+from src.attempt.repositories.user_rewarded_question import UserRewardedQuestionRepository
+from src.attempt.repositories.outbox_event import OutboxEventRepository
 from src.quiz.repositories.quiz import QuizRepository
 
 
 class AbstractUnitOfWork(ABC):
-    """Abstract base class for the Unit of Work pattern.
-    
-    Provides an interface for managing transactional boundaries and repository access.
+    """
+    Defines the transactional boundary for quiz operations.
+    Automatically handles rollback on exceptions.
     """
 
-    attempts: AttemptRepository
-    outbox: OutboxRepository
+    quiz_attempts: QuizAttemptRepository
+    user_answers: UserQuestionAnswerRepository
+    user_rewards: UserRewardedQuestionRepository
+    outbox: OutboxEventRepository
     quizzes: QuizRepository
 
     async def __aenter__(self) -> AbstractUnitOfWork:
         return self
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        await self.rollback()
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_type is not None:
+            await self.rollback()
 
     @abstractmethod
     async def commit(self) -> None:
-        """Commits the current transaction."""
         raise NotImplementedError
 
     @abstractmethod
     async def rollback(self) -> None:
-        """Rolls back the current transaction."""
         raise NotImplementedError
 
 
 class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
-    """SQLAlchemy implementation of the Unit of Work pattern.
-    
-    Manages the lifecycle of an AsyncSession and orchestrates repositories.
+    """
+    SQLAlchemy-backed UoW.
+    Creates a fresh session on entry and safely closes it on exit.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initializes the UoW with a session and its repositories.
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession] | None = None) -> None:
+        self._session_factory = session_factory or db_helper.session_factory
 
-        Args:
-            session: SQLAlchemy async session.
-        """
-        self._session = session
-        self.attempts = AttemptRepository(session)
-        self.outbox = OutboxRepository(session)
-        self.quizzes = QuizRepository(session)
+    async def __aenter__(self) -> SqlAlchemyUnitOfWork:
+        self._session: AsyncSession = self._session_factory()
+
+        self.quiz_attempts = QuizAttemptRepository(self._session)
+        self.user_answers = UserQuestionAnswerRepository(self._session)
+        self.user_rewards = UserRewardedQuestionRepository(self._session)
+        self.outbox = OutboxEventRepository(self._session)
+        self.quizzes = QuizRepository(self._session)
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await super().__aexit__(exc_type, exc_val, exc_tb)
+        await self._session.close()
 
     async def commit(self) -> None:
-        """Commits the database session."""
         await self._session.commit()
 
     async def rollback(self) -> None:
-        """Rolls back the database session."""
         await self._session.rollback()
 
 
-from typing import Annotated
-from fastapi import Depends
-
-IUnitOfWork: type[SqlAlchemyUnitOfWork] = Annotated[
-    SqlAlchemyUnitOfWork, Depends()
-]
+IUnitOfWork = Annotated[AbstractUnitOfWork, Depends(SqlAlchemyUnitOfWork)]
