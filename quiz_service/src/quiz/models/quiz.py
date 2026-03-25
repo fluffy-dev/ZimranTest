@@ -1,75 +1,43 @@
-import uuid
-from enum import Enum
-from typing import Any
+from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+import uuid
+from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import Boolean
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.libs.base_model import Base, TimestampMixin
 
-
-class QuestionType(str, Enum):
-    SINGLE_CHOICE = "single_choice"
-    FILL_GAP = "fill_gap"
-    MULTIPLE_CHOICE = "multiple_choice"
-    MATCHING = "matching"
-
+if TYPE_CHECKING:
+    from src.attempt.models.quiz_attempt import QuizAttempt
+    from src.quiz.models.question import Question
 
 class Quiz(TimestampMixin, Base):
-    """
-    A quiz with localized title and description.
-    title/description stored as JSONB: {"en": "...", "de": "...", "tr": "...", ...}
+    """SQLAlchemy model representing a strictly localized quiz entity.
+
+    Attributes:
+        id: The unique UUID primary key.
+        title: A dictionary containing localized titles keyed by language code.
+        description: A dictionary containing localized descriptions, or None if absent.
+        is_active: A boolean flag indicating if the quiz is accessible for attempts.
+        questions: A collection of associated question entities.
+        attempts: A collection of user attempt entities associated with this quiz.
     """
 
     __tablename__ = "quizzes"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     title: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     description: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    questions: Mapped[list["Question"]] = relationship(
-        "Question", back_populates="quiz", cascade="all, delete-orphan", lazy="selectin"
+    questions: Mapped[list[Question]] = relationship(
+        "Question",
+        back_populates="quiz",
+        cascade="all, delete-orphan",
     )
-    attempts: Mapped[list["QuizAttempt"]] = relationship(
-        "QuizAttempt", back_populates="quiz"
-    )
-
-
-class Question(TimestampMixin, Base):
-    """
-    SQLAlchemy model representing a Quiz Question.
-    Type-specific data is stored in JSONB payload.
-
-    Payload shapes:
-    - single_choice:   {"options": [{"id": str, "text": {locale: str}}, ...], "correct_id": str}
-    - fill_gap:        {"correct_answers": [str, ...]}  (list of accepted strings, case-insensitive)
-    - multiple_choice: {"options": [{"id": str, "text": {locale: str}}, ...], "correct_ids": [str, ...]}
-    - matching:        {"pairs": [{"id": str, "left": {locale: str}, "right": {locale: str}}, ...]}
-    """
-
-    __tablename__ = "questions"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    quiz_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False
-    )
-    type: Mapped[str] = mapped_column(String(30), nullable=False)
-    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    text: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-
-    quiz: Mapped[Quiz] = relationship("Quiz", back_populates="questions")
-    answers: Mapped[list["UserQuestionAnswer"]] = relationship(
-        "UserQuestionAnswer", back_populates="question"
-    )
-
-    __table_args__ = (
-        Index("idx_questions_quiz_id", "quiz_id"),
-        Index("idx_questions_quiz_order", "quiz_id", "order_index"),
+    attempts: Mapped[list[QuizAttempt]] = relationship(
+        "QuizAttempt",
+        back_populates="quiz",
     )
