@@ -73,4 +73,4 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         await self._session.rollback()
 
 
-IUnitOfWork = Annotated[AbstractUnitOfWork, Depends(SqlAlchemyUnitOfWork)]
+IUnitOfWork: type[AbstractUnitOfWork] = Annotated[AbstractUnitOfWork, Depends(SqlAlchemyUnitOfWork)]

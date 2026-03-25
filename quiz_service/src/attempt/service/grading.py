@@ -3,67 +3,67 @@ from __future__ import annotations
 from typing import Any
 
 from src.quiz.entities import QuestionEntity
+from src.attempt.dto import StrictAnswerPayload
 
 
 class GradingService:
-    """Business logic for grading different types of quiz questions.
-    
-    Supports single choice, multiple choice, fill in the gap, and matching.
-    """
+    """Business logic for evaluating strictly typed user answers."""
 
-    def check_answer(self, question: QuestionEntity, user_payload: Any) -> bool:
-        """Grades a user's answer against the question's correct answer.
+    def check_answer(self, question: QuestionEntity, answer: StrictAnswerPayload) -> bool:
+        """
+        Evaluates a user's validated answer payload against the correct question payload.
 
         Args:
-            question: The question entity containing the correct answer payload.
-            user_payload: The user's submitted answer payload.
+            question: The domain entity of the question containing the correct answers.
+            answer: The strictly validated Pydantic answer payload.
 
         Returns:
-            bool: True if the answer is correct, False otherwise.
+            True if the answer is correct, False otherwise.
         """
-        q_type = question.type
         payload = question.payload
+        q_type = answer.question_type
 
         if q_type == "single_choice":
-            return str(user_payload.get("selected_id")) == str(payload.get("correct_id"))
+            return str(answer.selected_id) == str(payload.get("correct_id"))
 
         if q_type == "multiple_choice":
-            user_ids = set(map(str, user_payload.get("selected_ids", [])))
-            correct_ids = set(map(str, payload.get("correct_ids", [])))
+            user_ids = {str(uid) for uid in answer.selected_ids}
+            correct_ids = {str(cid) for cid in payload.get("correct_ids", [])}
             return user_ids == correct_ids
 
         if q_type == "fill_gap":
-            user_text = str(user_payload.get("text", "")).strip().lower()
+            user_text = answer.answer.strip().lower()
             correct_texts = [str(t).strip().lower() for t in payload.get("correct_answers", [])]
             return user_text in correct_texts
 
         if q_type == "matching":
-            return self._check_matching(payload, user_payload)
+            return self._check_matching(payload, answer)
 
         return False
 
-    def _check_matching(self, payload: dict[str, Any], answer: dict[str, Any]) -> bool:
-        """Verifies matched pairs for matching questions.
+    def _check_matching(self, payload: dict[str, Any], answer: StrictAnswerPayload) -> bool:
+        """
+        Verifies matched pairs for matching questions.
 
         Args:
             payload: Question payload containing correct pairs.
-            answer: User submitted pairs.
+            answer: User submitted pairs strictly validated by Pydantic.
 
         Returns:
-            bool: True if all pairs match correctly.
+            True if all pairs match correctly.
         """
         correct_pairs = payload.get("pairs", [])
-        user_pairs = answer.get("pairs", [])
+        user_pairs = answer.pairs
 
         if len(correct_pairs) != len(user_pairs):
             return False
 
-        correct_map = {str(p["left_id"]): str(p["right_id"]) for p in correct_pairs}
-        
+        correct_map = {str(p.get("left_id")): str(p.get("right_id")) for p in correct_pairs}
+
         for up in user_pairs:
-            left = str(up.get("left_id"))
-            right = str(up.get("right_id"))
+            left = str(up.pair_id)
+            right = str(up.matched_pair_id)
             if correct_map.get(left) != right:
                 return False
-        
+
         return True

@@ -4,22 +4,61 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+import uuid
+from typing import Annotated, Literal, Union
+
+from pydantic import BaseModel, Field
+
+
+class SingleChoicePayload(BaseModel):
+    """Strict schema for a single choice answer."""
+    question_type: Literal["single_choice"]
+    selected_id: uuid.UUID
+
+
+class MultipleChoicePayload(BaseModel):
+    """Strict schema for a multiple choice answer."""
+    question_type: Literal["multiple_choice"]
+    selected_ids: list[uuid.UUID] = Field(..., min_length=1)
+
+
+class FillGapPayload(BaseModel):
+    """Strict schema for a fill-in-the-gap answer."""
+    question_type: Literal["fill_gap"]
+    answer: str = Field(..., min_length=1, strip_whitespace=True)
+
+
+class MatchingPair(BaseModel):
+    """Strict schema for a single matching pair."""
+    pair_id: uuid.UUID
+    matched_pair_id: uuid.UUID
+
+
+class MatchingPayload(BaseModel):
+    """Strict schema for a matching question answer."""
+    question_type: Literal["matching"]
+    pairs: list[MatchingPair] = Field(..., min_length=1)
+
+
+
+StrictAnswerPayload: type[SingleChoicePayload | MultipleChoicePayload | FillGapPayload | MatchingPayload] = Annotated[
+    Union[
+        SingleChoicePayload, 
+        MultipleChoicePayload, 
+        FillGapPayload, 
+        MatchingPayload
+    ],
+    Field(discriminator="question_type")
+]
+
+
 class AnswerItemDTO(BaseModel):
     """
-    DTO for a single question answer in a submission.
-    Contains the question ID and the answer payload.
+    DTO for a single question answer. 
+    Now strictly typed—zero raw dicts allowed.
     """
     question_id: uuid.UUID
-    answer_payload: dict[str, Any] = Field(
-        ...,
-        description=(
-            "Type-specific answer. "
-            "single_choice: {selected_id: str}; "
-            "fill_gap: {answer: str}; "
-            "multiple_choice: {selected_ids: [str]}; "
-            "matching: {pairs: [{pair_id: str, matched_pair_id: str}]}"
-        ),
-    )
+    answer_payload: StrictAnswerPayload
 
 
 class SubmitAttemptDTO(BaseModel):
