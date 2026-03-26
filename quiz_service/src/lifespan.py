@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import redis.asyncio as aioredis
@@ -10,8 +10,10 @@ import redis.asyncio as aioredis
 from src.config.redis import settings as redis_settings
 from src.config.rabbitmq import settings as rmq_settings
 from src.config.outbox import settings as outbox_settings
+from src.config.attempt import settings as attempt_settings
 from src.config.database.engine import db_helper
 from src.attempt.repositories.outbox_event import OutboxEventRepository
+from src.attempt.repositories.quiz_attempt import QuizAttemptRepository
 from src.attempt.entities import OutboxEventEntity
 from shared.logging import get_logger
 from shared.messaging import MessagePublisher
@@ -23,6 +25,39 @@ logger = get_logger(__name__)
 redis_client: Optional[aioredis.Redis] = None
 _publisher: Optional[MessagePublisher] = None
 _outbox_task: Optional[asyncio.Task] = None
+_abandonment_task: Optional[asyncio.Task] = None
+
+
+class AttemptAbandonmentProcessor:
+    """
+    Periodically checks for and marks stale in-progress attempts as abandoned.
+    """
+
+    def __init__(self) -> None:
+        self._session_factory = db_helper.session_factory
+
+    async def run(self) -> None:
+        logger.info("Attempt abandonment poller starting", interval=attempt_settings.abandon_poll_interval)
+        try:
+            while True:
+                await self._process()
+                await asyncio.sleep(attempt_settings.abandon_poll_interval)
+        except asyncio.CancelledError:
+            logger.info("Attempt abandonment poller task received cancellation signal")
+        except Exception as exc:
+            logger.exception("Attempt abandonment poller encountered unhandled exception", error=str(exc))
+
+    async def _process(self) -> None:
+        try:
+            threshold = datetime.now(tz=timezone.utc) - timedelta(minutes=attempt_settings.abandon_timeout_minutes)
+            async with self._session_factory() as session:
+                repo = QuizAttemptRepository(session)
+                count = await repo.bulk_mark_abandoned(threshold)
+                await session.commit()
+                if count > 0:
+                    logger.info("Marked stale attempts as abandoned", count=count)
+        except Exception as exc:
+            logger.error("Failed to run attempt abandonment job", error=str(exc))
 
 
 class OutboxProcessor:
@@ -158,14 +193,26 @@ async def startup() -> None:
     processor = OutboxProcessor(_publisher)
     _outbox_task = asyncio.create_task(processor.run(), name="outbox_poller")
 
+    # 4. Start Attempt Abandonment Poller
+    abandon_processor = AttemptAbandonmentProcessor()
+    _abandonment_task = asyncio.create_task(abandon_processor.run(), name="attempt_abandonment_poller")
+
 
 async def shutdown() -> None:
     """
     Gracefully terminates all background tasks and external connections.
     """
-    global redis_client, _publisher, _outbox_task
+    global redis_client, _publisher, _outbox_task, _abandonment_task
 
     logger.info("Initiating graceful shutdown")
+
+    if _abandonment_task:
+        _abandonment_task.cancel()
+        try:
+            await _abandonment_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Attempt abandonment poller task terminated")
 
     if _outbox_task:
         _outbox_task.cancel()
