@@ -739,7 +739,7 @@ The validate_attempt_access static method enforces three invariants before any m
 
 Concurrent submission protection is implemented via SELECT ... FOR UPDATE on the attempt row. PostgreSQL holds a row-level exclusive lock until the surrounding transaction is committed or rolled back, preventing any concurrent session from reading a stale status.
 
-An attempt abandonment background job is prepared in the repository (bulk_mark_abandoned) to handle stalled sessions, though the periodic scheduler that calls it is not wired to the lifespan in the current codebase.
+An attempt abandonment background job runs in the service lifespan to handle stalled sessions. It periodically queries the repository's `bulk_mark_abandoned` method to transition stale, inactive IN_PROGRESS attempts to ABANDONED automatically, ensuring that abandoned sessions do not persist indefinitely.
 
 ### 6.9 API Reference
 
@@ -1500,6 +1500,8 @@ uvicorn src.app:app --host 0.0.0.0 --port 8001 --reload
 | RABBITMQ_ROUTING_KEY | quiz.questions.rewarded | Routing key for quiz reward events |
 | OUTBOX_POLL_INTERVAL | 2.0 | Outbox worker polling interval in seconds |
 | OUTBOX_BATCH_SIZE | 50 | Outbox events per polling batch |
+| ATTEMPT_ABANDON_POLL_INTERVAL | 60.0 | Polling interval (seconds) for the attempt abandonment background job |
+| ATTEMPT_ABANDON_TIMEOUT_MINUTES | 60 | Inactivity threshold before an attempt is considered abandoned |
 | QUIZ_COINS_PER_CORRECT_ANSWER | 100 | Coins awarded per correctly answered question |
 | QUIZ_REWARD_ROUTING_KEY | quiz.questions.rewarded | Routing key embedded in outbox events |
 | LOGGING_ON | True | Enable logging |
@@ -2163,10 +2165,6 @@ The .env files contain actual database credentials and should be replaced with .
 ### Migration container runtime pip install
 
 The migration containers install alembic and asyncpg via pip at runtime. This should be moved to the builder stage of the Dockerfile by adding these as regular dependencies in pyproject.toml.
-
-### Attempt abandonment background job not wired
-
-The QuizAttemptRepository.bulk_mark_abandoned method exists but no periodic task calls it. In production, stalled in-progress attempts should be cleaned up so their state does not remain as in_progress indefinitely. This can be added to the lifespan startup as a periodic asyncio task alongside the outbox worker.
 
 ### No authentication or authorization
 
