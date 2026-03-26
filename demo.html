@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finelo Quizzes & Wallet</title>
+  <style>
+    :root {
+      --bg: #f9fafb;
+      --surface: #ffffff;
+      --border: #e5e7eb;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --radius: 12px;
+      --font: 'Inter', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+      cursor: pointer;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .user-badge {
+      color: var(--text-muted);
+      background: var(--bg);
+    }
+
+    .balance-badge {
+      color: var(--warning);
+      background: #fef3c7;
+      border-color: #fde68a;
+      cursor: pointer;
+      transition: transform 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .balance-badge:hover {
+      transform: scale(1.05);
+    }
+
+    main {
+      flex: 1;
+      padding: 40px 24px;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .view {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      background: var(--bg);
+    }
+
+    .quiz-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+
+    .quiz-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+
+    .quiz-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+      border-color: var(--primary);
+    }
+
+    .quiz-card h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .quiz-card p {
+      color: var(--text-muted);
+      font-size: 14px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      margin-bottom: 32px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--primary);
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .question-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .question-text {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      line-height: 1.4;
+    }
+
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .option-label {
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .option-label:hover {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    .option-label input[type="radio"],
+    .option-label input[type="checkbox"] {
+      margin-right: 16px;
+      transform: scale(1.2);
+      accent-color: var(--primary);
+    }
+
+    .option-label.selected {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+
+    .text-input {
+      width: 100%;
+      padding: 16px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: var(--font);
+      transition: border-color 0.2s;
+    }
+
+    .text-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .quiz-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .question-counter {
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .results-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 48px 32px;
+      text-align: center;
+    }
+
+    .score-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #ecfdf5;
+      color: var(--success);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto 24px;
+      border: 4px solid #a7f3d0;
+    }
+
+    .score-circle span {
+      font-size: 32px;
+      font-weight: 700;
+    }
+
+    .transaction-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .transaction-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface);
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .transaction-info strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text-main);
+    }
+
+    .transaction-info span {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .transaction-amount {
+      font-weight: 700;
+      color: var(--success);
+      font-size: 18px;
+    }
+
+    footer {
+      margin-top: auto;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 12px;
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      align-items: center;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    footer input {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      background: var(--bg);
+      color: var(--text-muted);
+    }
+
+    .loader {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="logo" onclick="loadCatalog()">Finelo</div>
+    <div class="header-actions">
+      <div class="badge balance-badge" onclick="loadTransactions()">
+        🪙 <span id="balance-display">0</span>
+      </div>
+      <div class="badge user-badge" id="user-display">User: Guest</div>
+    </div>
+  </header>
+
+  <main>
+    <div id="view-catalog" class="view active">
+      <h1>Available Quizzes</h1>
+      <p class="subtitle">Select a quiz to test your knowledge.</p>
+      <div class="quiz-grid" id="catalog-grid"></div>
+    </div>
+
+    <div id="view-start" class="view">
+      <button class="btn btn-outline" style="margin-bottom: 24px; padding: 8px 16px;" onclick="loadCatalog()">←
+        Back</button>
+      <h1 id="start-title">Quiz Title</h1>
+      <p class="subtitle" id="start-desc">Quiz Description</p>
+      <button class="btn" onclick="startAttempt()" id="btn-start">
+        <span>Start Quiz</span>
+        <div class="loader" id="start-loader"></div>
+      </button>
+    </div>
+
+    <div id="view-quiz" class="view">
+      <div class="progress-bar">
+        <div class="progress-fill" id="quiz-progress"></div>
+      </div>
+
+      <div class="question-container" id="question-render-area"></div>
+
+      <div class="quiz-footer">
+        <span class="question-counter" id="quiz-counter">Question 1 of X</span>
+        <button class="btn" onclick="handleNextStep()" id="btn-next">
+          <span id="btn-next-text">Next Question</span>
+          <div class="loader" id="next-loader"></div>
+        </button>
+      </div>
+    </div>
+
+    <div id="view-results" class="view">
+      <div class="results-card">
+        <div class="score-circle">
+          <span id="result-score">--</span>
+        </div>
+        <h2>Quiz Completed!</h2>
+        <p class="subtitle" id="result-text">Your answers have been submitted successfully.</p>
+        <button class="btn" onclick="loadCatalog()">Back to Catalog</button>
+      </div>
+    </div>
+
+    <div id="view-transactions" class="view">
+      <button class="btn btn-outline" style="margin-bottom: 24px; padding: 8px 16px;" onclick="loadCatalog()">←
+        Back</button>
+      <h1>Transaction History</h1>
+      <p class="subtitle">Your recent balance events.</p>
+      <div class="transaction-list" id="transactions-grid"></div>
+    </div>
+  </main>
+
+  <footer>
+    <label>Quiz API: <input id="quiz-url" value="http://localhost:8002/api/v1" /></label>
+    <label>Balance API: <input id="balance-url" value="http://localhost:8001/api/v1" /></label>
+    <label>Locale: <input id="locale" value="en" style="width: 40px;" /></label>
+    <label>User ID: <input id="user-id" readonly style="width: 250px;" /></label>
+  </footer>
+
+  <script>
+    const state = {
+      locale: 'en',
+      activeQuiz: null,
+      activeAttemptId: null,
+      questions: [],
+      currentQuestionIndex: 0,
+      userAnswers: []
+    };
+
+    function init() {
+      const userId = crypto.randomUUID();
+      document.getElementById('user-id').value = userId;
+      document.getElementById('user-display').innerText = `User: ${userId.substring(0, 6)}...`;
+
+      document.getElementById('locale').addEventListener('change', (e) => {
+        state.locale = e.target.value;
+        loadCatalog();
+      });
+
+      loadCatalog();
+      fetchBalance();
+    }
+
+    async function api(method, service, path, body = null) {
+      const baseUrlId = service === 'quiz' ? 'quiz-url' : 'balance-url';
+      const url = document.getElementById(baseUrlId).value + path;
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-User-ID': document.getElementById('user-id').value,
+        'Accept-Language': state.locale
+      };
+
+      const opts = { method, headers };
+      if (body) opts.body = JSON.stringify(body);
+
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error(`API Error: ${res.status}`);
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
+    }
+
+    function showView(id) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function setLoader(btnId, show) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = show;
+      btn.querySelector('.loader').style.display = show ? 'inline-block' : 'none';
+    }
+
+    async function fetchBalance() {
+      const userId = document.getElementById('user-id').value;
+      try {
+        const data = await api('GET', 'balance', `/balances/${userId}`);
+        document.getElementById('balance-display').innerText = data.amount;
+      } catch (e) {
+        document.getElementById('balance-display').innerText = 'Err';
+        console.warn("Could not fetch balance:", e);
+      }
+    }
+
+    async function loadTransactions() {
+      showView('view-transactions');
+      const grid = document.getElementById('transactions-grid');
+      grid.innerHTML = '<p>Loading transactions...</p>';
+
+      const userId = document.getElementById('user-id').value;
+
+      try {
+        const data = await api('GET', 'balance', `/balances/${userId}/transactions`);
+        const txns = Array.isArray(data) ? data : (data.items || data.data || []);
+
+        if (txns.length === 0) {
+          grid.innerHTML = '<p>No transactions found.</p>';
+          return;
+        }
+
+        grid.innerHTML = txns.map(t => `
+      <div class="transaction-item">
+        <div class="transaction-info">
+          <strong>${t.type.toUpperCase()}</strong>
+          <span>${t.description || 'No description provided'} • ${new Date(t.created_at).toLocaleDateString()}</span>
+        </div>
+        <div class="transaction-amount">+${t.amount}</div>
+      </div>
+    `).join('');
+      } catch (e) {
+        grid.innerHTML = `<p style="color:red">Failed to load transactions. Check Balance API.</p>`;
+      }
+    }
+
+    async function loadCatalog() {
+      showView('view-catalog');
+      const grid = document.getElementById('catalog-grid');
+      grid.innerHTML = '<p>Loading quizzes...</p>';
+
+      try {
+        const data = await api('GET', 'quiz', '/quizzes?limit=50');
+        const quizzes = Array.isArray(data) ? data : (data.items || data.data || []);
+
+        if (quizzes.length === 0) {
+          grid.innerHTML = '<p>No active quizzes found.</p>';
+          return;
+        }
+
+        grid.innerHTML = quizzes.map(q => `
+      <div class="quiz-card" onclick="viewQuiz('${q.id}')">
+        <h3>${getLocText(q.title)}</h3>
+        <p>${getLocText(q.description) || 'Click to view details'}</p>
+      </div>
+    `).join('');
+      } catch (e) {
+        grid.innerHTML = `<p style="color:red">Failed to load quizzes. Make sure Quiz API is running.</p>`;
+      }
+    }
+
+    async function viewQuiz(id) {
+      try {
+        const quiz = await api('GET', 'quiz', `/quizzes/${id}`);
+        state.activeQuiz = quiz;
+        document.getElementById('start-title').innerText = getLocText(quiz.title);
+        document.getElementById('start-desc').innerText = getLocText(quiz.description) || '';
+        showView('view-start');
+      } catch (e) { alert('Failed to load quiz details.'); }
+    }
+
+    async function startAttempt() {
+      setLoader('btn-start', true);
+      try {
+        const attempt = await api('POST', 'quiz', `/attempts/${state.activeQuiz.id}/start`);
+        state.activeAttemptId = attempt.attempt_id || attempt.id;
+        state.questions = state.activeQuiz.questions || [];
+        state.currentQuestionIndex = 0;
+        state.userAnswers = [];
+
+        if (state.questions.length === 0) throw new Error("This quiz has no questions.");
+
+        renderCurrentQuestion();
+        showView('view-quiz');
+      } catch (e) {
+        alert(e.message || 'Failed to start attempt.');
+      } finally {
+        setLoader('btn-start', false);
+      }
+    }
+
+    function renderCurrentQuestion() {
+      const q = state.questions[state.currentQuestionIndex];
+      const total = state.questions.length;
+
+      document.getElementById('quiz-counter').innerText = `Question ${state.currentQuestionIndex + 1} of ${total}`;
+      document.getElementById('quiz-progress').style.width = `${((state.currentQuestionIndex) / total) * 100}%`;
+
+      const isLast = state.currentQuestionIndex === total - 1;
+      document.getElementById('btn-next-text').innerText = isLast ? 'Submit Quiz' : 'Next Question';
+
+      const area = document.getElementById('question-render-area');
+      let html = `<div class="question-text">${getLocText(q.text)}</div><div class="options-grid">`;
+
+      if (q.type === 'single_choice' || q.type === 'multiple_choice') {
+        const isMulti = q.type === 'multiple_choice';
+        const typeAttr = isMulti ? 'checkbox' : 'radio';
+        q.payload.options.forEach(opt => {
+          html += `
+        <label class="option-label" onclick="toggleSelection(this, ${isMulti})">
+          <input type="${typeAttr}" name="answer" value="${opt.id}">
+          ${getLocText(opt.text)}
+        </label>`;
+        });
+      } else if (q.type === 'fill_gap') {
+        html += `<input type="text" class="text-input" id="answer-input" placeholder="Type your answer here..." autocomplete="off">`;
+      } else {
+        html += `<p><em>Unsupported question type: ${q.type}</em></p>`;
+      }
+
+      html += `</div>`;
+      area.innerHTML = html;
+    }
+
+    function toggleSelection(labelElement, isMulti) {
+      if (!isMulti) {
+        document.querySelectorAll('.option-label').forEach(el => el.classList.remove('selected'));
+      }
+      setTimeout(() => {
+        if (labelElement.querySelector('input').checked) {
+          labelElement.classList.add('selected');
+        } else {
+          labelElement.classList.remove('selected');
+        }
+      }, 10);
+    }
+
+    async function handleNextStep() {
+      const q = state.questions[state.currentQuestionIndex];
+      let answerPayload = null;
+
+      if (q.type === 'single_choice') {
+        const sel = document.querySelector('input[name="answer"]:checked');
+        if (!sel) return alert('Please select an answer');
+        answerPayload = { question_type: 'single_choice', selected_id: sel.value };
+      } else if (q.type === 'multiple_choice') {
+        const sels = Array.from(document.querySelectorAll('input[name="answer"]:checked')).map(el => el.value);
+        if (sels.length === 0) return alert('Please select at least one answer');
+        answerPayload = { question_type: 'multiple_choice', selected_ids: sels };
+      } else if (q.type === 'fill_gap') {
+        const val = document.getElementById('answer-input').value.trim();
+        if (!val) return alert('Please enter an answer');
+        answerPayload = { question_type: 'fill_gap', answer: val };
+      }
+
+      const currentAnswer = { question_id: q.id, answer_payload: answerPayload };
+      setLoader('btn-next', true);
+
+      try {
+        await api('PUT', 'quiz', `/attempts/${state.activeAttemptId}/answers`, { answer: currentAnswer }).catch(() => { });
+        state.userAnswers.push(currentAnswer);
+
+        if (state.currentQuestionIndex < state.questions.length - 1) {
+          state.currentQuestionIndex++;
+          renderCurrentQuestion();
+        } else {
+          await finishQuiz();
+        }
+      } finally {
+        setLoader('btn-next', false);
+      }
+    }
+
+    async function finishQuiz() {
+      try {
+        const result = await api('POST', 'quiz', `/attempts/${state.activeAttemptId}/submit`, { answers: state.userAnswers });
+        const scoreText = result.coins_awarded !== undefined ? `+${result.coins_awarded}` : 'Done!';
+        document.getElementById('result-score').innerText = scoreText;
+
+        showView('view-results');
+
+        setTimeout(() => {
+          fetchBalance();
+        }, 1500);
+
+      } catch (e) {
+        alert('Error submitting quiz: ' + e.message);
+      }
+    }
+
+    function getLocText(val) {
+      if (!val) return '';
+      if (typeof val === 'string') {
+        try { const parsed = JSON.parse(val); return parsed[state.locale] || parsed['en'] || val; }
+        catch (e) { return val; }
+      }
+      return val[state.locale] || val['en'] || JSON.stringify(val);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+
+</html>
