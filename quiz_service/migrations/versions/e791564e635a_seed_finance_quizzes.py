@@ -49,200 +49,203 @@ def upgrade() -> None:
     op.bulk_insert(quizzes_table, [
         {
             "id": quiz_1_id,
-            "title": {"en": "Basics of Investing", "ru": "Основы инвестирования", "ge": "Grundlagen des Investierens"},
+            "title": {"en": "Basics of Investing", "ru": "Основы инвестирования", "de": "Grundlagen des Investierens"},
             "description": {"en": "Core concepts of the stock market.", "ru": "Основные концепции фондового рынка.",
-                            "ge": "Grundkonzepte des Aktienmarktes."},
+                            "de": "Grundkonzepte des Aktienmarktes."},
             "is_active": True
         },
         {
             "id": quiz_2_id,
-            "title": {"en": "Personal Finance", "ru": "Личные финансы", "ge": "Persönliche Finanzen"},
+            "title": {"en": "Personal Finance", "ru": "Личные финансы", "de": "Persönliche Finanzen"},
             "description": {"en": "Test your knowledge on managing money.",
                             "ru": "Проверьте свои знания в управлении деньгами.",
-                            "ge": "Testen Sie Ihr Wissen über Geldmanagement."},
+                            "de": "Testen Sie Ihr Wissen über Geldmanagement."},
             "is_active": True
         },
         {
             "id": quiz_3_id,
             "title": {"en": "Advanced Investments", "ru": "Продвинутые инвестиции",
-                      "ge": "Fortgeschrittene Investitionen"},
+                      "de": "Fortgeschrittene Investitionen"},
             "description": {"en": "Deep dive into financial instruments.",
                             "ru": "Глубокое погружение в финансовые инструменты.",
-                            "ge": "Tiefer Einblick in Finanzinstrumente."},
+                            "de": "Tiefer Einblick in Finanzinstrumente."},
             "is_active": True
         }
     ])
 
     # 4. Seed Questions
-    questions_data = [
-        # --- QUIZ 1: Basics of Investing ---
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_1_id, "type": "multiple_choice", "order_index": 1,
-            "text": {"en": "What represents ownership in a company?",
-                     "ru": "Что представляет собой доля собственности в компании?",
-                     "ge": "Was repräsentiert das Eigentum an einem Unternehmen?"},
-            "payload": {
-                "options": [{"en": "A Bond", "ru": "Облигация", "ge": "Eine Anleihe"},
-                            {"en": "A Stock", "ru": "Акция", "ge": "Eine Aktie"},
-                            {"en": "Cash", "ru": "Наличные", "ge": "Bargeld"}],
-                "correct_index": 1
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_1_id, "type": "multiple_choice", "order_index": 2,
-            "text": {"en": "What characterizes a 'bull market'?", "ru": "Что характеризует 'бычий рынок'?",
-                     "ge": "Was kennzeichnet einen 'Bullenmarkt'?"},
-            "payload": {
-                "options": [{"en": "Rising prices", "ru": "Растущие цены", "ge": "Steigende Preise"},
-                            {"en": "Falling prices", "ru": "Падающие цены", "ge": "Fallende Preise"},
-                            {"en": "Stagnant prices", "ru": "Стагнирующие цены", "ge": "Stagnierende Preise"}],
-                "correct_index": 0
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_1_id, "type": "true_false", "order_index": 3,
-            "text": {"en": "Diversification generally increases your investment risk.",
-                     "ru": "Диверсификация обычно увеличивает ваш инвестиционный риск.",
-                     "ge": "Diversifikation erhöht im Allgemeinen Ihr Anlagerisiko."},
-            "payload": {"correct_answer": False}
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_1_id, "type": "multiple_choice", "order_index": 4,
-            "text": {"en": "What does ROI stand for?", "ru": "Что означает ROI?", "ge": "Wofür steht ROI?"},
-            "payload": {
-                "options": [{"en": "Rate of Inflation", "ru": "Уровень инфляции", "ge": "Inflationsrate"},
-                            {"en": "Return on Investment", "ru": "Окупаемость инвестиций", "ge": "Kapitalrendite"},
-                            {"en": "Risk of Interest", "ru": "Риск процентов", "ge": "Zinsrisiko"}],
-                "correct_index": 1
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_1_id, "type": "true_false", "order_index": 5,
-            "text": {"en": "A bond is essentially a loan you make to a company or government.",
-                     "ru": "Облигация — это, по сути, кредит, который вы даете компании или правительству.",
-                     "ge": "Eine Anleihe ist im Wesentlichen ein Darlehen, das Sie einem Unternehmen oder einer Regierung gewähren."},
-            "payload": {"correct_answer": True}
-        },
+    questions_data = []
 
-        # --- QUIZ 2: Personal Finance ---
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_2_id, "type": "multiple_choice", "order_index": 1,
-            "text": {"en": "What is the primary purpose of an emergency fund?",
-                     "ru": "Какова основная цель резервного фонда?",
-                     "ge": "Was ist der Hauptzweck eines Notgroschens?"},
+    def make_single_choice(q_id, q_quiz_id, q_order, q_text_en, q_text_ru, q_text_de, options_data, correct_idx):
+        opts = [
+            {"id": str(uuid.uuid4()), "text": {"en": opt["en"], "ru": opt["ru"], "de": opt["de"]}}
+            for opt in options_data
+        ]
+        return {
+            "id": q_id,
+            "quiz_id": q_quiz_id,
+            "type": "SINGLE_CHOICE",
+            "order_index": q_order,
+            "text": {"en": q_text_en, "ru": q_text_ru, "de": q_text_de},
             "payload": {
-                "options": [
-                    {"en": "Buying luxury goods", "ru": "Покупка предметов роскоши", "ge": "Kauf von Luxusgütern"},
-                    {"en": "Investing in crypto", "ru": "Инвестиции в крипту", "ge": "Investieren in Krypto"},
-                    {"en": "Covering unexpected expenses", "ru": "Покрытие непредвиденных расходов",
-                     "ge": "Deckung unerwarteter Ausgaben"}],
-                "correct_index": 2
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_2_id, "type": "multiple_choice", "order_index": 2,
-            "text": {"en": "The 50/30/20 budgeting rule suggests allocating 20% to...",
-                     "ru": "Правило бюджета 50/30/20 предлагает выделять 20% на...",
-                     "ge": "Die 50/30/20-Budgetierungsregel schlägt vor, 20% zuzuweisen für..."},
-            "payload": {
-                "options": [{"en": "Wants", "ru": "Желания", "ge": "Wünsche"},
-                            {"en": "Savings and Debt", "ru": "Сбережения и долги", "ge": "Ersparnisse und Schulden"},
-                            {"en": "Needs", "ru": "Потребности", "ge": "Bedürfnisse"}],
-                "correct_index": 1
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_2_id, "type": "true_false", "order_index": 3,
-            "text": {"en": "Inflation decreases your purchasing power over time.",
-                     "ru": "Инфляция со временем снижает вашу покупательную способность.",
-                     "ge": "Inflation verringert Ihre Kaufkraft im Laufe der Zeit."},
-            "payload": {"correct_answer": True}
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_2_id, "type": "multiple_choice", "order_index": 4,
-            "text": {"en": "What does a credit score evaluate?", "ru": "Что оценивает кредитный рейтинг?",
-                     "ge": "Was bewertet eine Kreditwürdigkeit?"},
-            "payload": {
-                "options": [{"en": "Your total net worth", "ru": "Ваш общий капитал", "ge": "Ihr Gesamtvermögen"},
-                            {"en": "Your borrowing risk", "ru": "Ваш риск как заемщика", "ge": "Ihr Kreditrisiko"},
-                            {"en": "Your annual salary", "ru": "Вашу годовую зарплату", "ge": "Ihr Jahresgehalt"}],
-                "correct_index": 1
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_2_id, "type": "true_false", "order_index": 5,
-            "text": {"en": "Compound interest applies only to the initial principal, not accumulated interest.",
-                     "ru": "Сложный процент применяется только к первоначальной сумме, а не к накопленным процентам.",
-                     "ge": "Zinseszins gilt nur für das ursprüngliche Kapital, nicht für angesammelte Zinsen."},
-            "payload": {"correct_answer": False}
-        },
-
-        # --- QUIZ 3: Advanced Investments ---
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_3_id, "type": "multiple_choice", "order_index": 1,
-            "text": {"en": "What is an ETF?", "ru": "Что такое ETF?", "ge": "Was ist ein ETF?"},
-            "payload": {
-                "options": [{"en": "Equity Trading Facility", "ru": "Механизм торговли акциями",
-                             "ge": "Aktienhandelsfazilität"},
-                            {"en": "Exchange-Traded Fund", "ru": "Биржевой инвестиционный фонд",
-                             "ge": "Börsengehandelter Fonds"},
-                            {"en": "Extra Tax Fee", "ru": "Дополнительный налоговый сбор",
-                             "ge": "Zusätzliche Steuergebühr"}],
-                "correct_index": 1
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_3_id, "type": "multiple_choice", "order_index": 2,
-            "text": {"en": "What does 'short selling' mean?", "ru": "Что означает 'короткая продажа' (шорт)?",
-                     "ge": "Was bedeutet 'Leerverkauf'?"},
-            "payload": {
-                "options": [{"en": "Betting an asset's price will fall", "ru": "Ставка на падение цены актива",
-                             "ge": "Wetten, dass der Preis eines Vermögenswerts fällt"},
-                            {"en": "Selling assets very quickly", "ru": "Очень быстрая продажа активов",
-                             "ge": "Sehr schneller Verkauf von Vermögenswerten"},
-                            {"en": "Selling fractional shares", "ru": "Продажа дробных акций",
-                             "ge": "Verkauf von Teilaktien"}],
-                "correct_index": 0
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_3_id, "type": "true_false", "order_index": 3,
-            "text": {"en": "High liquidity means an asset is difficult to sell quickly without losing value.",
-                     "ru": "Высокая ликвидность означает, что актив трудно продать быстро без потери стоимости.",
-                     "ge": "Eine hohe Liquidität bedeutet, dass ein Vermögenswert schwer schnell ohne Wertverlust zu verkaufen ist."},
-            "payload": {"correct_answer": False}
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_3_id, "type": "multiple_choice", "order_index": 4,
-            "text": {"en": "What is a dividend?", "ru": "Что такое дивиденд?", "ge": "Was ist eine Dividende?"},
-            "payload": {
-                "options": [
-                    {"en": "A tax on investments", "ru": "Налог на инвестиции", "ge": "Eine Steuer auf Investitionen"},
-                    {"en": "A portion of company profits paid to shareholders",
-                     "ru": "Часть прибыли компании, выплачиваемая акционерам",
-                     "ge": "Ein Teil des Unternehmensgewinns, der an die Aktionäre ausgeschüttet wird"},
-                    {"en": "A fee to brokers", "ru": "Комиссия брокерам", "ge": "Eine Gebühr an Makler"}],
-                "correct_index": 1
-            }
-        },
-        {
-            "id": uuid.uuid4(), "quiz_id": quiz_3_id, "type": "multiple_choice", "order_index": 5,
-            "text": {"en": "How is a company's Market Capitalization calculated?",
-                     "ru": "Как рассчитывается рыночная капитализация компании?",
-                     "ge": "Wie wird die Marktkapitalisierung eines Unternehmens berechnet?"},
-            "payload": {
-                "options": [
-                    {"en": "Total assets minus total liabilities", "ru": "Общие активы минус общие обязательства",
-                     "ge": "Gesamtvermögen abzüglich Gesamtverbindlichkeiten"},
-                    {"en": "Share price multiplied by total number of shares",
-                     "ru": "Цена акции, умноженная на общее количество акций",
-                     "ge": "Aktienkurs multipliziert mit der Gesamtzahl der Aktien"},
-                    {"en": "Annual revenue divided by profit", "ru": "Годовой доход, разделенный на прибыль",
-                     "ge": "Jahresumsatz geteilt durch Gewinn"}],
-                "correct_index": 1
+                "correct_id": opts[correct_idx]["id"],
+                "options": opts
             }
         }
-    ]
+
+    def make_true_false(q_id, q_quiz_id, q_order, q_text_en, q_text_ru, q_text_de, is_true):
+        return make_single_choice(
+            q_id, q_quiz_id, q_order, q_text_en, q_text_ru, q_text_de,
+            [
+                {"en": "True", "ru": "Правильно", "de": "Wahr"},
+                {"en": "False", "ru": "Неправильно", "de": "Falsch"}
+            ],
+            0 if is_true else 1
+        )
+
+    questions_data.extend([
+        # --- QUIZ 1: Basics of Investing ---
+        make_single_choice(
+            uuid.uuid4(), quiz_1_id, 1,
+            "What represents ownership in a company?",
+            "Что представляет собой доля собственности в компании?",
+            "Was repräsentiert das Eigentum an einem Unternehmen?",
+            [{"en": "A Bond", "ru": "Облигация", "de": "Eine Anleihe"},
+             {"en": "A Stock", "ru": "Акция", "de": "Eine Aktie"},
+             {"en": "Cash", "ru": "Наличные", "de": "Bargeld"}],
+            1
+        ),
+        make_single_choice(
+            uuid.uuid4(), quiz_1_id, 2,
+            "What characterizes a 'bull market'?",
+            "Что характеризует 'бычий рынок'?",
+            "Was kennzeichnet einen 'Bullenmarkt'?",
+            [{"en": "Rising prices", "ru": "Растущие цены", "de": "Steigende Preise"},
+             {"en": "Falling prices", "ru": "Падающие цены", "de": "Fallende Preise"},
+             {"en": "Stagnant prices", "ru": "Стагнирующие цены", "de": "Stagnierende Preise"}],
+            0
+        ),
+        make_true_false(
+            uuid.uuid4(), quiz_1_id, 3,
+            "Diversification generally increases your investment risk.",
+            "Диверсификация обычно увеличивает ваш инвестиционный риск.",
+            "Diversifikation erhöht im Allgemeinen Ihr Anlagerisiko.",
+            False
+        ),
+        make_single_choice(
+            uuid.uuid4(), quiz_1_id, 4,
+            "What does ROI stand for?",
+            "Что означает ROI?",
+            "Wofür steht ROI?",
+            [{"en": "Rate of Inflation", "ru": "Уровень инфляции", "de": "Inflationsrate"},
+             {"en": "Return on Investment", "ru": "Окупаемость инвестиций", "de": "Kapitalrendite"},
+             {"en": "Risk of Interest", "ru": "Риск процентов", "de": "Zinsrisiko"}],
+            1
+        ),
+        make_true_false(
+            uuid.uuid4(), quiz_1_id, 5,
+            "A bond is essentially a loan you make to a company or government.",
+            "Облигация — это, по сути, кредит, который вы даете компании или правительству.",
+            "Eine Anleihe ist im Wesentlichen ein Darlehen, das Sie einem Unternehmen oder einer Regierung gewähren.",
+            True
+        ),
+
+        # --- QUIZ 2: Personal Finance ---
+        make_single_choice(
+            uuid.uuid4(), quiz_2_id, 1,
+            "What is the primary purpose of an emergency fund?",
+            "Какова основная цель резервного фонда?",
+            "Was ist der Hauptzweck eines Notgroschens?",
+            [{"en": "Buying luxury goods", "ru": "Покупка предметов роскоши", "de": "Kauf von Luxusgütern"},
+             {"en": "Investing in crypto", "ru": "Инвестиции в крипту", "de": "Investieren in Krypto"},
+             {"en": "Covering unexpected expenses", "ru": "Покрытие непредвиденных расходов", "de": "Deckung unerwarteter Ausgaben"}],
+            2
+        ),
+        make_single_choice(
+            uuid.uuid4(), quiz_2_id, 2,
+            "The 50/30/20 budgeting rule suggests allocating 20% to...",
+            "Правило бюджета 50/30/20 предлагает выделять 20% на...",
+            "Die 50/30/20-Budgetierungsregel schlägt vor, 20% zuzuweisen für...",
+            [{"en": "Wants", "ru": "Желания", "de": "Wünsche"},
+             {"en": "Savings and Debt", "ru": "Сбережения и долги", "de": "Ersparnisse und Schulden"},
+             {"en": "Needs", "ru": "Потребности", "de": "Bedürfnisse"}],
+            1
+        ),
+        make_true_false(
+            uuid.uuid4(), quiz_2_id, 3,
+            "Inflation decreases your purchasing power over time.",
+            "Инфляция со временем снижает вашу покупательную способность.",
+            "Inflation verringert Ihre Kaufkraft im Laufe der Zeit.",
+            True
+        ),
+        make_single_choice(
+            uuid.uuid4(), quiz_2_id, 4,
+            "What does a credit score evaluate?",
+            "Что оценивает кредитный рейтинг?",
+            "Was bewertet eine Kreditwürdigkeit?",
+            [{"en": "Your total net worth", "ru": "Ваш общий капитал", "de": "Ihr Gesamtvermögen"},
+             {"en": "Your borrowing risk", "ru": "Ваш риск как заемщика", "de": "Ihr Kreditrisiko"},
+             {"en": "Your annual salary", "ru": "Вашу годовую зарплату", "de": "Ihr Jahresgehalt"}],
+            1
+        ),
+        make_true_false(
+            uuid.uuid4(), quiz_2_id, 5,
+            "Compound interest applies only to the initial principal, not accumulated interest.",
+            "Сложный процент применяется только к первоначальной сумме, а не к накопленным процентам.",
+            "Zinseszins gilt nur für das ursprüngliche Kapital, nicht für angesammelte Zinsen.",
+            False
+        ),
+
+        # --- QUIZ 3: Advanced Investments ---
+        make_single_choice(
+            uuid.uuid4(), quiz_3_id, 1,
+            "What is an ETF?",
+            "Что такое ETF?",
+            "Was ist ein ETF?",
+            [{"en": "Equity Trading Facility", "ru": "Механизм торговли акциями", "de": "Aktienhandelsfazilität"},
+             {"en": "Exchange-Traded Fund", "ru": "Биржевой инвестиционный фонд", "de": "Börsengehandelter Fonds"},
+             {"en": "Extra Tax Fee", "ru": "Дополнительный налоговый сбор", "de": "Zusätzliche Steuergebühr"}],
+            1
+        ),
+        make_single_choice(
+            uuid.uuid4(), quiz_3_id, 2,
+            "What does 'short selling' mean?",
+            "Что означает 'короткая продажа' (шорт)?",
+            "Was bedeutet 'Leerverkauf'?",
+            [{"en": "Betting an asset's price will fall", "ru": "Ставка на падение цены актива", "de": "Wetten, dass der Preis eines Vermögenswerts fällt"},
+             {"en": "Selling assets very quickly", "ru": "Очень быстрая продажа активов", "de": "Sehr schneller Verkauf von Vermögenswerten"},
+             {"en": "Selling fractional shares", "ru": "Продажа дробных акций", "de": "Verkauf von Teilaktien"}],
+            0
+        ),
+        make_true_false(
+            uuid.uuid4(), quiz_3_id, 3,
+            "High liquidity means an asset is difficult to sell quickly without losing value.",
+            "Высокая ликвидность означает, что актив трудно продать быстро без потери стоимости.",
+            "Eine hohe Liquidität bedeutet, dass ein Vermögenswert schwer schnell ohne Wertverlust zu verkaufen ist.",
+            False
+        ),
+        make_single_choice(
+            uuid.uuid4(), quiz_3_id, 4,
+            "What is a dividend?",
+            "Что такое дивиденд?",
+            "Was ist eine Dividende?",
+            [{"en": "A tax on investments", "ru": "Налог на инвестиции", "de": "Eine Steuer auf Investitionen"},
+             {"en": "A portion of company profits paid to shareholders", "ru": "Часть прибыли компании, выплачиваемая акционерам", "de": "Ein Teil des Unternehmensgewinns, der an die Aktionäre ausgeschüttet wird"},
+             {"en": "A fee to brokers", "ru": "Комиссия брокерам", "de": "Eine Gebühr an Makler"}],
+            1
+        ),
+        make_single_choice(
+            uuid.uuid4(), quiz_3_id, 5,
+            "How is a company's Market Capitalization calculated?",
+            "Как рассчитывается рыночная капитализация компании?",
+            "Wie wird die Marktkapitalisierung eines Unternehmens berechnet?",
+            [{"en": "Total assets minus total liabilities", "ru": "Общие активы минус общие обязательства", "de": "Gesamtvermögen abzüglich Gesamtverbindlichkeiten"},
+             {"en": "Share price multiplied by total number of shares", "ru": "Цена акции, умноженная на общее количество акций", "de": "Aktienkurs multipliziert mit der Gesamtzahl der Aktien"},
+             {"en": "Annual revenue divided by profit", "ru": "Годовой доход, разделенный на прибыль", "de": "Jahresumsatz geteilt durch Gewinn"}],
+            1
+        )
+    ])
+
 
     op.bulk_insert(questions_table, questions_data)
 
