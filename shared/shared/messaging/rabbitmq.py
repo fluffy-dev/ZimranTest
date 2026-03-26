@@ -1,15 +1,6 @@
-"""
-RabbitMQ implementation of the MessagePublisher and MessageConsumer protocols.
-
-Switch to Kafka: replace this import in lifespan.py / consumer.py:
-    from shared.messaging.rabbitmq import RabbitMQPublisher, RabbitMQConsumer
-with:
-    from shared.messaging.kafka import KafkaPublisher, KafkaConsumer
-"""
 from __future__ import annotations
 
 import asyncio
-
 import aio_pika
 import aio_pika.abc
 
@@ -20,11 +11,6 @@ logger = get_logger(__name__)
 
 
 class RabbitMQPublisher:
-    """
-    RabbitMQ publisher — implements MessagePublisher.
-    Designed for the Transactional Outbox pattern: each event is
-    published and acked individually.
-    """
 
     def __init__(
         self,
@@ -39,14 +25,21 @@ class RabbitMQPublisher:
         self._channel: aio_pika.abc.AbstractRobustChannel | None = None
         self._exchange: aio_pika.abc.AbstractExchange | None = None
 
+    @property
+    def is_connected(self) -> bool:
+        """Returns True when the publisher has an active open connection."""
+        return (
+            self._connection is not None
+            and not self._connection.is_closed
+            and self._exchange is not None
+        )
+
     async def connect(self) -> None:
         self._connection = await aio_pika.connect_robust(self._url)
         self._channel = await self._connection.channel()
         await self._channel.set_qos(prefetch_count=1)
         self._exchange = await self._channel.declare_exchange(
-            self._exchange_name,
-            self._exchange_type,
-            durable=True,
+            self._exchange_name, self._exchange_type, durable=True
         )
         logger.info("RabbitMQ publisher connected", exchange=self._exchange_name)
 
@@ -69,11 +62,6 @@ class RabbitMQPublisher:
 
 
 class RabbitMQConsumer:
-    """
-    RabbitMQ consumer — implements MessageConsumer.
-    Handler signature is normalized to (body, routing_key, message_id) bytes/str.
-    Messages that raise are nack'd → DLQ.
-    """
 
     def __init__(
         self,
@@ -94,40 +82,40 @@ class RabbitMQConsumer:
         self._channel: aio_pika.abc.AbstractRobustChannel | None = None
         self._queue: aio_pika.abc.AbstractQueue | None = None
 
+    @property
+    def is_connected(self) -> bool:
+        """Returns True when the consumer has an active open connection and queue."""
+        return (
+            self._connection is not None
+            and not self._connection.is_closed
+            and self._queue is not None
+        )
+
     async def connect(self) -> None:
         self._connection = await aio_pika.connect_robust(self._url)
         self._channel = await self._connection.channel()
         await self._channel.set_qos(prefetch_count=self._prefetch_count)
 
-        # Declare DLQ first
         dlq = await self._channel.declare_queue(self._dlq_name, durable=True)
-
-        # Declare main exchange
         exchange = await self._channel.declare_exchange(
-            self._exchange_name,
-            aio_pika.ExchangeType.TOPIC,
-            durable=True,
+            self._exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
         )
-
-        # Dead-letter exchange — direct, named after DLQ
         dlx_name = f"{self._dlq_name}.exchange"
         dlx = await self._channel.declare_exchange(
             dlx_name, aio_pika.ExchangeType.DIRECT, durable=True
         )
         await dlq.bind(dlx, routing_key=self._dlq_name)
 
-        # Declare main queue with DLX settings
         self._queue = await self._channel.declare_queue(
             self._queue_name,
             durable=True,
             arguments={
                 "x-dead-letter-exchange": dlx_name,
                 "x-dead-letter-routing-key": self._dlq_name,
-                "x-message-ttl": 60_000,  # 60s TTL before DLQ (on nack)
+                "x-message-ttl": 60000,
             },
         )
         await self._queue.bind(exchange, routing_key=self._routing_key)
-
         logger.info(
             "RabbitMQ consumer connected",
             queue=self._queue_name,
@@ -141,7 +129,6 @@ class RabbitMQConsumer:
         """
         if self._queue is None:
             raise RuntimeError("Consumer not connected. Call connect() first.")
-
         async with self._queue.iterator() as queue_iter:
             async for message in queue_iter:
                 try:

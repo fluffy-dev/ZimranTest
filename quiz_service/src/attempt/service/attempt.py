@@ -219,8 +219,8 @@ class AttemptService:
         question_map = {q.id: q for q in questions}
         submitted_ids = {ans.question_id for ans in request.answers}
 
-        if len(question_map) != len(submitted_ids):
-            missing = submitted_ids - set(question_map.keys())
+        missing = submitted_ids - set(question_map.keys())
+        if missing:
             raise ValidationException(f"Invalid question IDs in submission: {missing}")
 
         now = datetime.now(tz=timezone.utc)

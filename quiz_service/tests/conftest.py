@@ -1,7 +1,3 @@
-"""
-Shared fixtures for the entire test suite.
-Provides async-safe mocks for UoW, repositories, Redis, and session factories.
-"""
 from __future__ import annotations
 
 import uuid
@@ -10,19 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-
 from src.attempt.enum import AttemptStatusEnum
-from src.attempt.entities import (
-    OutboxEventEntity,
-    QuizAttemptEntity,
-)
+from src.attempt.entities import OutboxEventEntity, QuizAttemptEntity
 from src.quiz.entities import QuestionEntity, QuizEntity
 from src.quiz.enum import QuestionType
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 def utcnow() -> datetime:
     return datetime.now(tz=timezone.utc)
@@ -31,10 +19,6 @@ def utcnow() -> datetime:
 def make_uuid() -> uuid.UUID:
     return uuid.uuid4()
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Entity Factories
-# ─────────────────────────────────────────────────────────────────────────────
 
 def make_quiz_attempt(
     *,
@@ -63,13 +47,14 @@ def make_quiz(
     is_active: bool = True,
     questions: list[QuestionEntity] | None = None,
 ) -> QuizEntity:
+    qs = questions or []
     return QuizEntity(
         id=quiz_id or make_uuid(),
         title={"en": "Test Quiz", "de": "Test Quiz DE"},
         description={"en": "A quiz for testing"},
         is_active=is_active,
-        question_count=len(questions or []),
-        questions=questions or [],
+        question_count=len(qs),
+        questions=qs,
     )
 
 
@@ -80,9 +65,7 @@ def make_question(
     correct_id: uuid.UUID | None = None,
 ) -> QuestionEntity:
     cid = correct_id or make_uuid()
-    opt_id_1 = make_uuid()
     payload: dict = {}
-
     if q_type == QuestionType.SINGLE_CHOICE:
         payload = {
             "correct_id": str(cid),
@@ -105,7 +88,6 @@ def make_question(
         left = make_uuid()
         right = make_uuid()
         payload = {"pairs": [{"left_id": str(left), "right_id": str(right)}]}
-
     return QuestionEntity(
         id=question_id or make_uuid(),
         type=q_type,
@@ -119,7 +101,7 @@ def make_outbox_event(*, event_id: uuid.UUID | None = None) -> OutboxEventEntity
     return OutboxEventEntity(
         id=event_id or make_uuid(),
         event_type="quiz.rewarded",
-        routing_key="finance.reward",
+        routing_key="quiz.questions.rewarded",
         payload={"user_id": str(make_uuid()), "coins": 100},
         created_at=utcnow(),
         published_at=None,
@@ -127,9 +109,9 @@ def make_outbox_event(*, event_id: uuid.UUID | None = None) -> OutboxEventEntity
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Repository Mocks
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Repository mocks
+# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def mock_quiz_attempt_repo():
@@ -152,7 +134,6 @@ def mock_quiz_repo():
     repo.add = AsyncMock()
     repo.update = AsyncMock(return_value=True)
     repo.set_active_status = AsyncMock(return_value=True)
-    repo.get_questions_by_ids = AsyncMock(return_value=[])
     return repo
 
 
@@ -160,6 +141,7 @@ def mock_quiz_repo():
 def mock_question_repo():
     repo = AsyncMock()
     repo.get_by_id = AsyncMock(return_value=None)
+    repo.get_by_ids = AsyncMock(return_value=[])      # ← was missing
     repo.get_by_quiz_id = AsyncMock(return_value=[])
     repo.add = AsyncMock()
     repo.update = AsyncMock(return_value=True)
@@ -172,6 +154,7 @@ def mock_user_answers_repo():
     repo = AsyncMock()
     repo.bulk_add = AsyncMock()
     repo.upsert_draft = AsyncMock()
+    repo.bulk_upsert_graded_answers = AsyncMock()     # ← was missing
     return repo
 
 
@@ -193,10 +176,6 @@ def mock_outbox_repo():
     return repo
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Unit of Work Mock
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_uow(
     mock_quiz_attempt_repo,
@@ -211,7 +190,6 @@ def mock_uow(
     uow.__aexit__ = AsyncMock(return_value=False)
     uow.commit = AsyncMock()
     uow.rollback = AsyncMock()
-
     uow.quiz_attempts = mock_quiz_attempt_repo
     uow.quizzes = mock_quiz_repo
     uow.questions = mock_question_repo
@@ -220,10 +198,6 @@ def mock_uow(
     uow.outbox = mock_outbox_repo
     return uow
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Service Mocks
-# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def mock_grading_service():
@@ -239,10 +213,6 @@ def mock_reward_service():
     return svc
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Redis Mock
-# ─────────────────────────────────────────────────────────────────────────────
-
 @pytest.fixture
 def mock_redis():
     redis = AsyncMock()
@@ -253,10 +223,6 @@ def mock_redis():
     redis.ping = AsyncMock(return_value=True)
     return redis
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Publisher Mock
-# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def mock_publisher():

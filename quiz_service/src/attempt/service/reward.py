@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 from shared.schemas import QuizRewardEvent, QuizRewardPayload
 from src.attempt.entities import OutboxEventEntity, UserRewardedQuestionEntity
 from src.config.project import settings as project_settings
-from src.uow import AbstractUnitOfWork
 from src.config.rabbitmq import settings as rabbitmq_settings
+from src.uow import AbstractUnitOfWork
+
 
 class RewardService:
     """Service for calculating idempotent quiz rewards and staging outbox events.
@@ -17,11 +18,11 @@ class RewardService:
     """
     @staticmethod
     async def process_rewards(
-            uow: AbstractUnitOfWork,
-            user_id: uuid.UUID,
-            quiz_id: uuid.UUID,
-            attempt_id: uuid.UUID,
-            correct_question_ids: list[uuid.UUID],
+        uow: AbstractUnitOfWork,
+        user_id: uuid.UUID,
+        quiz_id: uuid.UUID,
+        attempt_id: uuid.UUID,
+        correct_question_ids: list[uuid.UUID],
     ) -> list[uuid.UUID]:
         """Calculates idempotent rewards and stages the outbox event.
 
@@ -41,11 +42,9 @@ class RewardService:
         already_rewarded_ids = await uow.user_rewards.get_rewarded_ids_by_questions(
             user_id, correct_question_ids
         )
-
         newly_rewarded_ids = [
             qid for qid in correct_question_ids if qid not in already_rewarded_ids
         ]
-
         if not newly_rewarded_ids:
             return []
 
@@ -62,7 +61,6 @@ class RewardService:
         await uow.user_rewards.bulk_add(reward_entities)
 
         coins = len(newly_rewarded_ids) * project_settings.quiz_coins_per_correct_answer
-
         event_payload = QuizRewardEvent(
             payload=QuizRewardPayload(
                 user_id=user_id,
@@ -72,7 +70,6 @@ class RewardService:
                 coins_to_award=coins,
             )
         )
-
         outbox_entity = OutboxEventEntity(
             id=uuid.uuid4(),
             event_type="quiz.rewarded",
@@ -83,5 +80,4 @@ class RewardService:
             attempts=0,
         )
         await uow.outbox.add(outbox_entity)
-
         return newly_rewarded_ids

@@ -337,3 +337,33 @@ RABBITMQ_URL
 REDIS_URL           (quiz_service only)
 APP_PORT
 ```
+
+
+
+
+need to deep analyze to check project code, find critical moments and answer why what and how to fix it
+
+you can refactor parts that you think should be
+
+
+but your main goal is to write tests for each service, for balance and quiz services, need to cover all edge cases, need to write tests such that after they completion be fully sure everything correct and nothing can broke project
+
+tests location in tests dir
+like:
+balance_service/tests/
+
+in tests likely to see also 3 dirs
+e2e/
+unit/
+integration/
+
+
+for every service like 100 tests that covers every edge case, every funcionality, every aspect of code, and give sure for service
+for shared dir as you much as you want
+
+write following best practices and industry standard, 
+i want to see enterprise level 
+
+also analyze setup, docker files, how everything attached and worked, maybe in devops part need to change something
+
+

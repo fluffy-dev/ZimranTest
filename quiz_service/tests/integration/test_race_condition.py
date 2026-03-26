@@ -123,7 +123,7 @@ class TestDoubleSubmitRace:
         uow.quiz_attempts.get_by_id_for_update = AsyncMock(side_effect=get_for_update)
         uow.quiz_attempts.update = AsyncMock(side_effect=update_attempt)
         uow.questions.get_by_ids = AsyncMock(return_value=[question])
-        uow.user_answers.bulk_add = AsyncMock()
+        uow.user_answers.bulk_upsert_graded_answers = AsyncMock()
 
         mock_grading_service.check_answer.return_value = True
         mock_reward_service.process_rewards = AsyncMock(return_value=[make_uuid()])
@@ -192,7 +192,7 @@ class TestDoubleSubmitRace:
         uow.quiz_attempts.get_by_id_for_update = AsyncMock(side_effect=get_for_update)
         uow.quiz_attempts.update = AsyncMock(side_effect=update_attempt)
         uow.questions.get_by_ids = AsyncMock(return_value=[question])
-        uow.user_answers.bulk_add = AsyncMock()
+        uow.user_answers.bulk_upsert_graded_answers = AsyncMock()
 
         mock_grading_service.check_answer.return_value = True
         mock_reward_service.process_rewards = AsyncMock(return_value=[])
@@ -261,10 +261,12 @@ class TestRewardIdempotency:
 
         await asyncio.gather(
             service.process_rewards(
+                uow=uow,
                 user_id=user_id, quiz_id=make_uuid(), attempt_id=make_uuid(),
                 correct_question_ids=[q1, q2],
             ),
             service.process_rewards(
+                uow=uow,
                 user_id=user_id, quiz_id=make_uuid(), attempt_id=make_uuid(),
                 correct_question_ids=[q1, q2],
             ),
@@ -294,7 +296,7 @@ class TestDbConnectionFailure:
         uow.__aenter__ = AsyncMock(return_value=uow)
         uow.quiz_attempts.get_by_id_for_update = AsyncMock(return_value=attempt)
         uow.questions.get_by_ids = AsyncMock(return_value=[question])
-        uow.user_answers.bulk_add = AsyncMock(
+        uow.user_answers.bulk_upsert_graded_answers = AsyncMock(
             side_effect=OperationalError("DB down", None, None)
         )
         # __aexit__ should trigger rollback on error

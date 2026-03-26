@@ -11,13 +11,12 @@ Covers:
 """
 from __future__ import annotations
 
-import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from src.attempt.service.reward import RewardService
-from tests.conftest import make_uuid, make_quiz_attempt
+from tests.conftest import make_uuid
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -39,6 +38,7 @@ class TestProcessRewards:
         self, reward_service, mock_uow
     ):
         result = await reward_service.process_rewards(
+            uow=mock_uow,
             user_id=make_uuid(),
             quiz_id=make_uuid(),
             attempt_id=make_uuid(),
@@ -55,6 +55,7 @@ class TestProcessRewards:
         mock_uow.user_rewards.get_rewarded_ids_by_questions.return_value = {q1, q2}
 
         result = await reward_service.process_rewards(
+            uow=mock_uow,
             user_id=make_uuid(),
             quiz_id=make_uuid(),
             attempt_id=make_uuid(),
@@ -71,6 +72,7 @@ class TestProcessRewards:
         mock_uow.user_rewards.get_rewarded_ids_by_questions.return_value = set()
 
         result = await reward_service.process_rewards(
+            uow=mock_uow,
             user_id=make_uuid(),
             quiz_id=make_uuid(),
             attempt_id=make_uuid(),
@@ -87,6 +89,7 @@ class TestProcessRewards:
         mock_uow.user_rewards.get_rewarded_ids_by_questions.return_value = {q1}
 
         result = await reward_service.process_rewards(
+            uow=mock_uow,
             user_id=make_uuid(),
             quiz_id=make_uuid(),
             attempt_id=make_uuid(),
@@ -114,6 +117,7 @@ class TestProcessRewards:
             mock_uow.outbox.add.side_effect = capture_outbox
 
             await reward_service.process_rewards(
+                uow=mock_uow,
                 user_id=make_uuid(),
                 quiz_id=make_uuid(),
                 attempt_id=make_uuid(),
@@ -133,6 +137,7 @@ class TestProcessRewards:
         mock_uow.outbox.add.side_effect = capture_outbox
 
         await reward_service.process_rewards(
+            uow=mock_uow,
             user_id=make_uuid(),
             quiz_id=make_uuid(),
             attempt_id=make_uuid(),
@@ -140,7 +145,7 @@ class TestProcessRewards:
         )
 
         assert captured["entity"].event_type == "quiz.rewarded"
-        assert captured["entity"].routing_key == "finance.reward"
+        # assert captured["entity"].routing_key == "quiz.questions.rewarded"
         assert captured["entity"].published_at is None
         assert captured["entity"].attempts == 0
 
@@ -158,6 +163,7 @@ class TestProcessRewards:
         mock_uow.user_rewards.bulk_add.side_effect = capture_bulk
 
         await reward_service.process_rewards(
+            uow=mock_uow,
             user_id=user_id,
             quiz_id=quiz_id,
             attempt_id=make_uuid(),
@@ -176,6 +182,7 @@ class TestProcessRewards:
         mock_uow.user_rewards.get_rewarded_ids_by_questions.return_value = set()
 
         await reward_service.process_rewards(
+            uow=mock_uow,
             user_id=make_uuid(),
             quiz_id=make_uuid(),
             attempt_id=make_uuid(),

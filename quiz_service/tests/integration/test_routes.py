@@ -52,16 +52,11 @@ HEADERS = {"X-User-ID": USER_ID}
 
 
 def make_client(attempt_svc=None, quiz_svc=None) -> TestClient:
-    """Creates a test client with overridden service dependencies."""
-
     overrides = {}
-
     if attempt_svc:
-        overrides[IAttemptService] = lambda: attempt_svc
-
+        overrides[AttemptService] = lambda: attempt_svc
     if quiz_svc:
-        overrides[IQuizService] = lambda: quiz_svc
-
+        overrides[QuizService] = lambda: quiz_svc
     app.dependency_overrides.update(overrides)
     client = TestClient(app, raise_server_exceptions=False)
     return client
