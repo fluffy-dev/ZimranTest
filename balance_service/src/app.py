@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-import uuid
-
 import structlog
 from fastapi import FastAPI, Request, status, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,10 +11,17 @@ from src.lifespan import lifespan
 from src.config.project import settings as project_settings
 from src.config.swagger import settings as swagger_settings
 from src.config.cors import settings as cors_settings
-from src.dependencies.common import HEADERS
-from shared.exceptions import FineloBaseException, NotFoundException
 from shared.logging import configure_logging
 from src.config.logging import settings as log_settings
+
+from shared.exceptions import (
+    AttemptAlreadyCompletedException,
+    ConflictException,
+    FineloBaseException,
+    NotFoundException,
+    ValidationException,
+    ForbiddenException
+)
 
 configure_logging(service_name="balance-service", log_level=log_settings.logging_level)
 logger = structlog.get_logger(__name__)
@@ -50,17 +53,19 @@ app.add_middleware(
 )
 
 
+
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
     """Injects a correlation ID into every request for distributed tracing."""
+    import uuid
 
-    h_name = HEADERS.CORRELATION_ID
-    correlation_id = request.headers.get(h_name, str(uuid.uuid4()))
+    correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
     structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
     response = await call_next(request)
-    response.headers[h_name] = correlation_id
+    response.headers["X-Correlation-ID"] = correlation_id
     structlog.contextvars.unbind_contextvars("correlation_id")
     return response
+
 
 
 @app.exception_handler(NotFoundException)
@@ -68,31 +73,53 @@ async def not_found_handler(request: Request, exc: NotFoundException) -> JSONRes
     """Returns 404 for domain-level not-found errors."""
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
-        content={
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-                "correlation_id": structlog.contextvars.get_contextvars().get("correlation_id"),
-            }
-        },
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+
+@app.exception_handler(ConflictException)
+async def conflict_handler(request: Request, exc: ConflictException) -> JSONResponse:
+    """Returns 409 for state conflict errors."""
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+
+@app.exception_handler(ValidationException)
+async def validation_handler(request: Request, exc: ValidationException) -> JSONResponse:
+    """Returns 422 for business validation errors."""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"error": {"code": exc.code, "message": exc.message}},
     )
 
 
 @app.exception_handler(FineloBaseException)
 async def domain_error_handler(request: Request, exc: FineloBaseException) -> JSONResponse:
     """Returns 500 for unhandled domain errors."""
-    logger.error("Domain exception", code=exc.code, message=exc.message)
+    logger.error("Unhandled domain exception", code=exc.code, message=exc.message)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-                "correlation_id": structlog.contextvars.get_contextvars().get("correlation_id"),
-            }
-        },
+        content={"error": {"code": exc.code, "message": exc.message}},
     )
 
+
+@app.exception_handler(AttemptAlreadyCompletedException)
+async def attempt_completed_exception_handler(request, exc: AttemptAlreadyCompletedException):
+    """Maps AttemptAlreadyCompletedException to an HTTP 409 Conflict response."""
+    return JSONResponse(
+        status_code=409,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+@app.exception_handler(ForbiddenException)
+async def forbidden_exception_handler(request, exc: ForbiddenException):
+    """Maps ForbiddenException to an HTTP 403 Forbidden response."""
+    return JSONResponse(
+        status_code=403,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
 
 @app.exception_handler(Exception)
 async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -100,13 +127,7 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
     logger.exception("Unexpected error", error=str(exc))
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": {
-                "code": "InternalServerError",
-                "message": "An unexpected error occurred.",
-                "correlation_id": structlog.contextvars.get_contextvars().get("correlation_id"),
-            }
-        },
+        content={"error": {"code": "InternalServerError", "message": "An unexpected error occurred."}},
     )
 
 router = APIRouter(prefix="/api/v1", tags=["API"])

@@ -114,15 +114,6 @@ async def domain_error_handler(request: Request, exc: FineloBaseException) -> JS
     )
 
 
-@app.exception_handler(Exception)
-async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Catches all unexpected errors and returns a generic 500 response."""
-    logger.exception("Unexpected error", error=str(exc))
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"error": {"code": "InternalServerError", "message": "An unexpected error occurred."}},
-    )
-
 @app.exception_handler(AttemptAlreadyCompletedException)
 async def attempt_completed_exception_handler(request, exc: AttemptAlreadyCompletedException):
     """Maps AttemptAlreadyCompletedException to an HTTP 409 Conflict response."""
@@ -137,6 +128,15 @@ async def forbidden_exception_handler(request, exc: ForbiddenException):
     return JSONResponse(
         status_code=403,
         content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+@app.exception_handler(Exception)
+async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catches all unexpected errors and returns a generic 500 response."""
+    logger.exception("Unexpected error", error=str(exc))
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": {"code": "InternalServerError", "message": "An unexpected error occurred."}},
     )
 
 api_v1 = APIRouter(prefix='/api/v1', tags=["API"])
